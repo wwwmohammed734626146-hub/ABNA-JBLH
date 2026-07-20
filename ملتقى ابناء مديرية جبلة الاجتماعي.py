@@ -63,7 +63,6 @@ def init_db():
         )
     ''')
 
-    # ضمان إضافة حساب المشرف الافتراضي في حال عدم وجوده
     cursor.execute(
         "INSERT OR IGNORE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')")
 
@@ -164,11 +163,11 @@ with st.sidebar:
     options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
 
     if st.session_state['logged_in']:
-        options.append("🔑 تغيير كلمة المرور")  # متاحة لأي مستخدم مسجل دخوله
+        options.append("⚙️ تعديل الحساب الشخصي (اسم المستخدم والكلمة)")
 
     if is_admin:
-        options.append("🔍 عرض استمارات النازحين")
         options.extend([
+            "🔍 عرض استمارات النازحين",
             "📦 توزيع السلال الغذائية",
             "🤝 إدارة الكفالات والرعايات",
             "📂 الأرشيف والمستندات",
@@ -369,108 +368,65 @@ elif choice == "📝 تعبئة استمارة جديدة":
             else:
                 st.error("❌ يرجى كتابة اسم رب الأسرة.")
 
-# --- قسم جديد: تغيير كلمة المرور ---
-elif choice == "🔑 تغيير كلمة المرور":
-    st.markdown("<h1>🔑 تغيير كلمة المرور</h1>", unsafe_allow_html=True)
+# --- 3. قسم تعديل الحساب الشخصي (اسم المستخدم وكلمة المرور) ---
+elif choice == "⚙️ تعديل الحساب الشخصي (اسم المستخدم والكلمة)":
+    st.markdown("<h1>⚙️ تعديل بيانات حسابك الشخصي</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    with st.form("change_password_form"):
-        st.subheader(f"تغيير كلمة المرور للحساب: **{st.session_state['username']}**")
-        old_pass = st.text_input("كلمة المرور الحالية:", type="password")
-        new_pass = st.text_input("كلمة المرور الجديدة:", type="password")
+    with st.form("update_profile_form"):
+        st.subheader(f"تعديل البيانات للحساب الحالي: **{st.session_state['username']}**")
+
+        new_username = st.text_input("اسم المستخدم الجديد:", value=st.session_state['username'])
+        new_fullname = st.text_input("الاسم الكامل:", value=st.session_state['full_name'])
+
+        st.write("---")
+        st.markdown("##### 🔒 لتغيير كلمة المرور (اختياري):")
+        old_pass = st.text_input("كلمة المرور الحالية (تأكيد):", type="password")
+        new_pass = st.text_input("كلمة المرور الجديدة (أتركها فارغة إذا لا تريد التغيير):", type="password")
         confirm_pass = st.text_input("تأكيد كلمة المرور الجديدة:", type="password")
 
-        update_btn = st.form_submit_button("🔒 تحديث كلمة المرور")
+        update_btn = st.form_submit_button("💾 حفظ التعديلات")
 
         if update_btn:
             conn = sqlite3.connect(DB_NAME)
             cursor = conn.cursor()
+
+            # التحقق من كلمة المرور الحالية
             cursor.execute("SELECT password FROM users WHERE username = ?", (st.session_state['username'],))
             current_db_pass = cursor.fetchone()
 
             if not current_db_pass or current_db_pass[0] != old_pass:
                 st.error("❌ كلمة المرور الحالية غير صحيحة.")
-            elif new_pass != confirm_pass:
-                st.error("❌ كلمة المرور الجديدة وتأكيدها غير متطابقين.")
-            elif len(new_pass) < 4:
-                st.warning("⚠️ يرجى أدخال كلمة مرور أطول (4 خانات على الأقل).")
             else:
-                cursor.execute("UPDATE users SET password = ? WHERE username = ?",
-                               (new_pass, st.session_state['username']))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تغيير كلمة المرور بنجاح!")
+                final_pass = old_pass
+                pass_changed = False
 
-# --- 3. عرض البيانات ---
+                if new_pass:
+                    if new_pass != confirm_pass:
+                        st.error("❌ كلمة المرور الجديدة وتأكيدها غير متطابقين.")
+                        st.stop()
+                    elif len(new_pass) < 4:
+                        st.warning("⚠️ كلمة المرور قصيرة جداً.")
+                        st.stop()
+                    else:
+                        final_pass = new_pass
+                        pass_changed = True
+
+                # تحديث قاعدة البيانات
+                try:
+                    cursor.execute(
+                        "UPDATE users SET username = ?, password = ?, full_name = ? WHERE username = ?",
+                        (new_username, final_pass, new_fullname, st.session_state['username'])
+                    )
+                    conn.commit()
+                    st.session_state['username'] = new_username
+                    st.session_state['full_name'] = new_fullname
+                    conn.close()
+                    st.success("✔️ تم تحديث بيانات حسابك بنجاح!")
+                    st.rerun()
+                except sqlite3.IntegrityError:
+                    st.error("❌ اسم المستخدم الجديد مستخدم بالفعل من قبل شخص آخر.")
+
+# --- 4. عرض بيانات الاستمارات ---
 elif choice == "🔍 عرض استمارات النازحين":
-    st.markdown("<h1>🔍 قاعدة بيانات الاستمارات المسجلة</h1>", unsafe_allow_html=True)
-    st.write("---")
-    conn = sqlite3.connect(DB_NAME)
-    df = pd.read_sql_query(
-        "SELECT id as 'ت', doc_number as 'رقم الاستمارة', head_name as 'اسم رب الأسرة', phone as 'رقم الهاتف', orig_gov as 'المحافظة الأصلية', total_family as 'عدد الأفراد' FROM refugees_full",
-        conn)
-    conn.close()
-    st.dataframe(df, use_container_width=True) if not df.empty else st.info("لا توجد استمارات مسجلة حالياً.")
-
-# --- 4. قسم توزيع السلال الغذائية ---
-elif choice == "📦 توزيع السلال الغذائية":
-    st.markdown("<h1>📦 قسم إدارة وتوزيع السلال الغذائية</h1>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### ➕ تسجيل عملية تسليم")
-        with st.form("food_form", clear_on_submit=True):
-            b_name = st.text_input("اسم المستفيد:")
-            b_phone = st.text_input("رقم الهاتف:")
-            b_type = st.selectbox("نوع السلة / المساعدة:",
-                                  ["سلة غذائية مكتملة", "سلة غذائية طارئة", "قسيمة شراء", "مساعدة نقدية"])
-            d_date = st.text_input("تاريخ التسليم:", value=datetime.now().strftime("%Y-%m-%d"))
-            notes = st.text_area("ملاحظات:")
-            if st.form_submit_button("💾 توثيق التسليم"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO food_baskets (beneficiary_name, phone, basket_type, dist_date, notes) VALUES (?,?,?,?,?)",
-                    (b_name, b_phone, b_type, d_date, notes))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تسليم وتوثيق المساعدة بنجاح!")
-    with col2:
-        st.markdown("### 📋 سجل التوزيع السلس")
-        conn = sqlite3.connect(DB_NAME)
-        df_f = pd.read_sql_query(
-            "SELECT id as 'ت', beneficiary_name as 'المستفيد', phone as 'الهاتف', basket_type as 'نوع السلة', dist_date as 'التاريخ' FROM food_baskets",
-            conn)
-        conn.close()
-        st.dataframe(df_f, use_container_width=True) if not df_f.empty else st.info("لا توجد سجلات تسليم بعد.")
-
-# --- 5. قسم الكفالات والرعايات ---
-elif choice == "🤝 إدارة الكفالات والرعايات":
-    st.markdown("<h1>🤝 قسم الكفالات والرعايات الشاملة</h1>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### ➕ إضافة كفالة جديدة")
-        with st.form("sp_form", clear_on_submit=True):
-            sp_b_name = st.text_input("اسم المكفول:")
-            sp_name = st.text_input("اسم الكفيل / الجهة:")
-            sp_type = st.selectbox("نوع الكفالة:", ["كفالة يتيم", "كفالة أسرة متعففة", "كفالة طالب علم", "رعاية صحية"])
-            sp_amount = st.number_input("المبلغ الشهري:", min_value=0.0, step=1000.0)
-            sp_date = st.text_input("تاريخ البدء:", value=datetime.now().strftime("%Y-%m-%d"))
-            if st.form_submit_button("💾 إضافة الكفالة"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO sponsorships (beneficiary_name, sponsor_name, sp_type, monthly_amount, start_date) VALUES (?,?,?,?,?)",
-                    (sp_b_name, sp_name, sp_type, sp_amount, sp_date))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تسجيل الكفالة بنجاح!")
-    with col2:
-        st.markdown("### 📋 سجل الكفالات النشطة")
-        conn = sqlite3.connect(DB_NAME)
-        df_sp = pd.read_sql_query(
-            "SELECT id as 'ت', beneficiary_name as 'المكفول', sponsor_name as 'الكفيل', sp_type as 'النوع', monthly_amount as 'المبلغ الشهري' FROM sponsorships",
-            conn)
-        conn.close()
-        st.dataframe(df_sp, use_container_width=True) if not df_sp.empty else st.info("لا توجد كفالات مسجلة بعد.")
+    st.m

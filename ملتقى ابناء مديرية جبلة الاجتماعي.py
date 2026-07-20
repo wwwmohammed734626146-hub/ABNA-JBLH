@@ -30,7 +30,7 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # 1. جدول النازحين والمستفيدين (محدث ليشمل كافة حقول الاستمارة الرسمية)
+    # 1. جدول النازحين والمستفيدين
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS refugees_full (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,9 +63,10 @@ def init_db():
         )
     ''')
 
-    # ضمان إضافة أو تحديث حساب المشرف الافتراضي مباشرة
+    # ضمان إضافة حساب المشرف الافتراضي في حال عدم وجوده
     cursor.execute(
-        "INSERT OR REPLACE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')")
+        "INSERT OR IGNORE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')"
+    )
 
     # 3. جدول المالية والإنفاق
     cursor.execute('''
@@ -163,7 +164,7 @@ with st.sidebar:
 
     options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
 
-    # إضافة خيار عرض الاستمارات فقط للمشرف، بالإضافة لباقي القوائم المتقدمة
+    # إضافة الخيارات للمشرف
     if is_admin:
         options.append("🔍 عرض استمارات النازحين")
         options.extend([
@@ -174,12 +175,16 @@ with st.sidebar:
             "💰 الصندوق والحسابات (الوارد والمنصرف)",
             "👥 إدارة القوى البشرية والكادر",
             "🔐 إدارة المستخدمين وكلمات المرور",
+            "🔑 تغيير كلمة المرور الخاص بي",  # الخيار الجديد
             "📥 تصدير التقارير (Excel)"
         ])
+    elif st.session_state['logged_in']:
+        # متاح لأي مستخدم مسجل تغيير كلمة المرور الخاصة به
+        options.append("🔑 تغيير كلمة المرور الخاص بي")
 
     choice = st.radio("القائمة الرئيسية:", options)
 
-# --- 1. لوحة التحكم الإحصائية (تم إخفاء السلال والرصيد المالي) ---
+# --- 1. لوحة التحكم الإحصائية ---
 if choice == "📊 لوحة التحكم الإحصائية":
     st.markdown("<h1>📊 لوحة التحكم الموحدة للملتقى</h1>", unsafe_allow_html=True)
     st.markdown("<h3>الجمهورية اليمنية - ملتقى أبناء مديرية جبلة - اللجنة الاجتماعية</h3>", unsafe_allow_html=True)
@@ -198,7 +203,7 @@ if choice == "📊 لوحة التحكم الإحصائية":
     with col2:
         st.metric("إجمالي الأفراد المستفيدين", f"{int(total_people)} فرد")
 
-# --- 2. تعبئة استمارة جديدة (استمارة نزوح كاملة طَبق الأصل للصورة) ---
+# --- 2. تعبئة استمارة جديدة ---
 elif choice == "📝 تعبئة استمارة جديدة":
     st.markdown("<h2 style='text-align: center;'>بسم الله الرحمن الرحيم</h2>", unsafe_allow_html=True)
     st.markdown("<h3 style='text-align: center;'>الجمهورية اليمنية<br>ملتقى أبناء مديرية جبلة<br>اللجنة الاجتماعية</h3>", unsafe_allow_html=True)
@@ -368,7 +373,7 @@ elif choice == "📝 تعبئة استمارة جديدة":
             else:
                 st.error("❌ يرجى كتابة اسم رب الأسرة.")
 
-# --- 3. عرض البيانات (محمي ومتاح للمشرف فقط) ---
+# --- 3. عرض البيانات ---
 elif choice == "🔍 عرض استمارات النازحين":
     st.markdown("<h1>🔍 قاعدة بيانات الاستمارات المسجلة</h1>", unsafe_allow_html=True)
     st.write("---")
@@ -379,257 +384,42 @@ elif choice == "🔍 عرض استمارات النازحين":
     conn.close()
     st.dataframe(df, use_container_width=True) if not df.empty else st.info("لا توجد استمارات مسجلة حالياً.")
 
-# --- 4. قسم توزيع السلال الغذائية ---
-elif choice == "📦 توزيع السلال الغذائية":
-    st.markdown("<h1>📦 قسم إدارة وتوزيع السلال الغذائية</h1>", unsafe_allow_html=True)
+# --- 4. تغيير كلمة المرور للمشرف/المستخدم الحاضر ---
+elif choice == "🔑 تغيير كلمة المرور الخاص بي":
+    st.markdown("<h1>🔑 تغيير كلمة المرور</h1>", unsafe_allow_html=True)
     st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### ➕ تسجيل عملية تسليم")
-        with st.form("food_form", clear_on_submit=True):
-            b_name = st.text_input("اسم المستفيد:")
-            b_phone = st.text_input("رقم الهاتف:")
-            b_type = st.selectbox("نوع السلة / المساعدة:",
-                                  ["سلة غذائية مكتملة", "سلة غذائية طارئة", "قسيمة شراء", "مساعدة نقدية"])
-            d_date = st.text_input("تاريخ التسليم:", value=datetime.now().strftime("%Y-%m-%d"))
-            notes = st.text_area("ملاحظات:")
-            if st.form_submit_button("💾 توثيق التسليم"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO food_baskets (beneficiary_name, phone, basket_type, dist_date, notes) VALUES (?,?,?,?,?)",
-                    (b_name, b_phone, b_type, d_date, notes))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تسليم وتوثيق المساعدة بنجاح!")
-    with col2:
-        st.markdown("### 📋 سجل التوزيع السلس")
-        conn = sqlite3.connect(DB_NAME)
-        df_f = pd.read_sql_query(
-            "SELECT id as 'ت', beneficiary_name as 'المستفيد', phone as 'الهاتف', basket_type as 'نوع السلة', dist_date as 'التاريخ' FROM food_baskets",
-            conn)
-        conn.close()
-        st.dataframe(df_f, use_container_width=True) if not df_f.empty else st.info("لا توجد سجلات تسليم بعد.")
 
-# --- 5. قسم الكفالات والرعايات ---
-elif choice == "🤝 إدارة الكفالات والرعايات":
-    st.markdown("<h1>🤝 قسم الكفالات والرعايات الشاملة</h1>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### ➕ إضافة كفالة جديدة")
-        with st.form("sp_form", clear_on_submit=True):
-            ben_name = st.text_input("اسم المكفول (يتيم/أسرة):")
-            spo_name = st.text_input("اسم الكافل / الداعم:")
-            sp_type = st.selectbox("نوع الكفالة:",
-                                   ["كفالة يتيم", "كفالة أسرة متعففة", "كفالة طالب علم", "كفالة علاجية"])
-            m_amount = st.number_input("المبلغ الشهري (ر.ي):", min_value=0.0, step=5000.0)
-            s_date = st.text_input("تاريخ بداية الكفالة:", value=datetime.now().strftime("%Y-%m-%d"))
-            if st.form_submit_button("💾 تسجيل الكفالة"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO sponsorships (beneficiary_name, sponsor_name, sp_type, monthly_amount, start_date) VALUES (?,?,?,?,?)",
-                    (ben_name, spo_name, sp_type, m_amount, s_date))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تسجيل الكفالة بنجاح!")
-    with col2:
-        st.markdown("### 📋 قائمة المكفولين والكفلاء")
-        conn = sqlite3.connect(DB_NAME)
-        df_sp = pd.read_sql_query(
-            "SELECT id as 'ت', beneficiary_name as 'المكفول', sponsor_name as 'الكافل', sp_type as 'النوع', monthly_amount as 'المبلغ الشهري' FROM sponsorships",
-            conn)
-        conn.close()
-        st.dataframe(df_sp, use_container_width=True) if not df_sp.empty else st.info("لا توجد كفالات مسجلة حالياً.")
-
-# --- 6. قسم الأرشيف والمستندات ---
-elif choice == "📂 الأرشيف والمستندات":
-    st.markdown("<h1>📂 قسم الأرشيف والمستندات الرقمية</h1>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### ➕ أرشفة وثيقة جديدة")
-        with st.form("arch_form", clear_on_submit=True):
-            doc_title = st.text_input("عنوان الوثيقة/الخطاب:")
-            doc_type = st.selectbox("نوع الوثيقة:",
-                                    ["مذكرة رسمية", "محضر اجتماع", "عقد/اتفاقية", "تقرير دوري", "وثيقة شخصية"])
-            ref_num = st.text_input("رقم الإشارة/ المرجع:")
-            doc_dt = st.text_input("تاريخ الوثيقة:", value=datetime.now().strftime("%Y-%m-%d"))
-            details = st.text_area("تفاصيل / ملخص الوثيقة:")
-            if st.form_submit_button("💾 أرشفة المستند"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO archive (doc_title, doc_type, doc_date, ref_number, details) VALUES (?,?,?,?,?)",
-                    (doc_title, doc_type, doc_dt, ref_num, details))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم أرشفة المستند بنجاح!")
-    with col2:
-        st.markdown("### 📋 الأرشيف الإلكتروني")
-        conn = sqlite3.connect(DB_NAME)
-        df_ar = pd.read_sql_query(
-            "SELECT id as 'ت', doc_title as 'العنوان', doc_type as 'النوع', ref_number as 'رقم المرجع', doc_date as 'التاريخ' FROM archive",
-            conn)
-        conn.close()
-        st.dataframe(df_ar, use_container_width=True) if not df_ar.empty else st.info("الأرشيف فارغ حالياً.")
-
-# --- 7. تعديل البيانات ---
-elif choice == "✏️ تعديل بيانات الاستمارات":
-    st.markdown("<h1>✏️ تعديل بيانات استمارة مسجلة</h1>", unsafe_allow_html=True)
-    st.write("---")
-    conn = sqlite3.connect(DB_NAME)
-    refugees = pd.read_sql_query("SELECT id, head_name, doc_number FROM refugees_full", conn)
-    conn.close()
-
-    if not refugees.empty:
-        refugee_list = [f"{row['id']} - {row['head_name']} (استمارة: {row['doc_number']})" for _, row in
-                        refugees.iterrows()]
-        selected_refugee = st.selectbox("اختر المستفيد للتعديل:", refugee_list)
-        selected_id = int(selected_refugee.split(" - ")[0])
-
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-        cursor.execute("SELECT head_name, phone, doc_number, total_family FROM refugees_full WHERE id = ?",
-                       (selected_id,))
-        ref_data = cursor.fetchone()
-        conn.close()
-
-        with st.form("edit_form"):
-            new_name = st.text_input("اسم رب الأسرة:", value=ref_data[0])
-            new_phone = st.text_input("رقم الهاتف:", value=ref_data[1])
-            new_doc = st.text_input("رقم الاستمارة:", value=ref_data[2])
-            new_family = st.number_input("عدد الأفراد:", value=ref_data[3], min_value=1)
-
-            if st.form_submit_button("🔄 حفظ التعديلات"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute("UPDATE refugees_full SET head_name=?, phone=?, doc_number=?, total_family=? WHERE id=?",
-                               (new_name, new_phone, new_doc, new_family, selected_id))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تحديث البيانات بنجاح!")
+    if not st.session_state['logged_in']:
+        st.warning("⚠️ يرجى تسجيل الدخول أولاً لتتمكن من تغيير كلمة المرور.")
     else:
-        st.info("لا توجد استمارات مسجلة للتعديل.")
+        current_username = st.session_state['username']
+        st.info(f"المستخدم الحالي: **{st.session_state['full_name']}** ({current_username})")
 
-# --- 8. الصندوق والحسابات ---
-elif choice == "💰 الصندوق والحسابات (الوارد والمنصرف)":
-    st.markdown("<h1>💰 إدارة الصندوق والمالية (الوارد والمنصرف)</h1>", unsafe_allow_html=True)
-    st.write("---")
-    tab1, tab2 = st.tabs(["➕ تسجيل حركة مالية", "📜 دفتر الصندوق"])
-    with tab1:
-        with st.form("finance_form", clear_on_submit=True):
-            col1, col2 = st.columns(2)
-            with col1:
-                trans_type = st.selectbox("نوع الحركة المالية:", ["وارد (إيراد)", "منصرف (مصروف)"])
-                amount = st.number_input("المبلغ (بالريال اليمني):", min_value=1.0, step=1000.0)
-                category = st.text_input("البند:")
-            with col2:
-                trans_date = st.text_input("التاريخ:", value=datetime.now().strftime("%Y-%m-%d"))
-                handler = st.text_input("المسؤول / أمين الصندوق:")
-                statement = st.text_area("البيان / التفاصيل:")
-            if st.form_submit_button("💾 قيد الحركة"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute(
-                    "INSERT INTO finance (trans_date, trans_type, category, amount, statement, handler) VALUES (?,?,?,?,?,?)",
-                    (trans_date, trans_type, category, amount, statement, handler))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم تسجيل الحركة المالية!")
-    with tab2:
-        conn = sqlite3.connect(DB_NAME)
-        fin_df = pd.read_sql_query(
-            "SELECT id as 'ت', trans_date as 'التاريخ', trans_type as 'النوع', category as 'البند', amount as 'المبلغ', statement as 'البيان' FROM finance ORDER BY id DESC",
-            conn)
-        conn.close()
-        st.dataframe(fin_df, use_container_width=True) if not fin_df.empty else st.info("لا توجد حركات تسجّل بعد.")
+        with st.form("change_password_form", clear_on_submit=True):
+            old_pass = st.text_input("كلمة المرور القديمة:", type="password")
+            new_pass = st.text_input("كلمة المرور الجديدة:", type="password")
+            confirm_pass = st.text_input("تأكيد كلمة المرور الجديدة:", type="password")
 
-# --- 9. إدارة القوى البشرية ---
-elif choice == "👥 إدارة القوى البشرية والكادر":
-    st.markdown("<h1>👥 إدارة الكادر الإداري والمتطوعين</h1>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        with st.form("hr_form", clear_on_submit=True):
-            full_name = st.text_input("اسم العضو / الموظف:")
-            role = st.text_input("الوظيفة:")
-            phone = st.text_input("التلفون:")
-            committee = st.selectbox("اللجنة:",
-                                     ["اللجنة الاجتماعية", "اللجنة المالية", "اللجنة الإعلامية", "الإدارة العامة"])
-            status = st.selectbox("الحالة:", ["نشط", "غير نشط"])
-            if st.form_submit_button("💾 إضافة"):
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO hr_staff (full_name, role, phone, committee, status) VALUES (?,?,?,?,?)",
-                               (full_name, role, phone, committee, status))
-                conn.commit()
-                conn.close()
-                st.success("✔️ تم التنزيل بنجاح!")
-    with col2:
-        conn = sqlite3.connect(DB_NAME)
-        hr_df = pd.read_sql_query(
-            "SELECT id as 'ت', full_name as 'الاسم', role as 'الوظيفة', phone as 'الهاتف', committee as 'اللجنة', status as 'الحالة' FROM hr_staff",
-            conn)
-        conn.close()
-        st.dataframe(hr_df, use_container_width=True) if not hr_df.empty else st.info("لا يوجد أعضاء مسجلون بعد.")
+            submit_change = st.form_submit_button("🔄 تحديث كلمة المرور")
 
-# --- 10. إدارة المستخدمين وكلمات المرور ---
-elif choice == "🔐 إدارة المستخدمين وكلمات المرور":
-    st.markdown("<h1>🔐 إدارة حسابات المستخدمين وصلاحيات النظام</h1>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        st.markdown("### ➕ إضافة مستخدم جديد")
-        with st.form("new_user_form", clear_on_submit=True):
-            new_u = st.text_input("اسم المستخدم (Username):")
-            new_p = st.text_input("كلمة المرور (Password):")
-            new_fn = st.text_input("الاسم الكامل:")
-            new_r = st.selectbox("الصلاحية:", ["مدخل بيانات", "مشرف النظام"])
-            if st.form_submit_button("💾 إضافة المستخدم"):
-                if new_u and new_p:
+            if submit_change:
+                if not old_pass or not new_pass or not confirm_pass:
+                    st.error("❌ يرجى ملء جميع الحقول المطلوب.")
+                elif new_pass != confirm_pass:
+                    st.error("❌ كلمة المرور الجديدة وتأكيدها غير متطابقين!")
+                else:
+                    # التحقق من صحة كلمة المرور القديمة في قاعدة البيانات
                     conn = sqlite3.connect(DB_NAME)
                     cursor = conn.cursor()
-                    try:
-                        cursor.execute("INSERT INTO users (username, password, role, full_name) VALUES (?,?,?,?)",
-                                       (new_u, new_p, new_r, new_fn))
-                        conn.commit()
-                        st.success("✔️ تم إضافة الحساب بنجاح!")
-                    except sqlite3.IntegrityError:
-                        st.error("❌ اسم المستخدم موجود بالفعل.")
-                    conn.close()
-                else:
-                    st.error("يرجى ملء اسم المستخدم وكلمة المرور.")
-    with col2:
-        st.markdown("### 📋 قائمة الحسابات المعتمدة")
-        conn = sqlite3.connect(DB_NAME)
-        users_table = pd.read_sql_query("SELECT id as 'ت', username as 'اسم المستخدم', role as 'الصلاحية', full_name as 'الاسم الكامل' FROM users", conn)
-        conn.close()
-        st.dataframe(users_table, use_container_width=True)
+                    cursor.execute("SELECT password FROM users WHERE username = ?", (current_username,))
+                    user_data = cursor.fetchone()
 
-# --- 11. تصدير التقارير إلى Excel ---
-elif choice == "📥 تصدير التقارير (Excel)":
-    st.markdown("<h1>📥 تصدير البيانات والتقارير الشاملة إلى Excel</h1>", unsafe_allow_html=True)
-    st.write("---")
-    
-    conn = sqlite3.connect(DB_NAME)
-    
-    # تجهيز ملف Excel يحتوي على كافة الجداول بصفحات متعددة
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        pd.read_sql_query("SELECT * FROM refugees_full", conn).to_excel(writer, sheet_name='النازحين والمستفيدين', index=False)
-        pd.read_sql_query("SELECT * FROM finance", conn).to_excel(writer, sheet_name='المالية والصندوق', index=False)
-        pd.read_sql_query("SELECT * FROM food_baskets", conn).to_excel(writer, sheet_name='السلال الغذائية', index=False)
-        pd.read_sql_query("SELECT * FROM sponsorships", conn).to_excel(writer, sheet_name='الكفالات والرعايات', index=False)
-        pd.read_sql_query("SELECT * FROM hr_staff", conn).to_excel(writer, sheet_name='الكادر الإداري', index=False)
-        pd.read_sql_query("SELECT * FROM archive", conn).to_excel(writer, sheet_name='الأرشيف', index=False)
-    
-    conn.close()
-    
-    st.download_button(
-        label="📥 تحميل تقرير القاعدة الشاملة (Excel)",
-        data=output.getvalue(),
-        file_name=f"تقرير_ملتقى_جبلة_{datetime.now().strftime('%Y_%m_%d')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+                    if user_data and user_data[0] == old_pass:
+                        # تحديث كلمة المرور
+                        cursor.execute("UPDATE users SET password = ? WHERE username = ?", (new_pass, current_username))
+                        conn.commit()
+                        conn.close()
+                        st.success("✅ تم تغيير كلمة المرور بنجاح!")
+                    else:
+                        conn.close()
+                        st.error("❌ 

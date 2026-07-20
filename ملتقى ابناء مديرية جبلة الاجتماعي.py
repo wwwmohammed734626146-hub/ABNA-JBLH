@@ -119,8 +119,6 @@ if 'logged_in' not in st.session_state:
     st.session_state['username'] = ''
     st.session_state['role'] = ''
     st.session_state['full_name'] = ''
-
-# --- القائمة الجانبية ---
 # --- القائمة الجانبية ---
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #075E54;'>🏢 ملتقى جبلة الاجتماعي</h2>", unsafe_allow_html=True)
@@ -180,6 +178,7 @@ with st.sidebar:
         ])
 
     choice = st.radio("القائمة الرئيسية:", options)
+
 
 
 

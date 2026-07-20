@@ -121,6 +121,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['full_name'] = ''
 
 # --- القائمة الجانبية ---
+# --- القائمة الجانبية ---
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #075E54;'>🏢 ملتقى جبلة الاجتماعي</h2>", unsafe_allow_html=True)
     st.write("---")
@@ -157,6 +158,30 @@ with st.sidebar:
             st.rerun()
 
     st.write("---")
+
+    # تحديد القوائم المتاحة بناءً على الصلاحيات
+    is_admin = (st.session_state['logged_in'] and st.session_state['role'] == "مشرف النظام")
+
+    options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
+
+    # إضافة الخيارات المتقدمة للمشرف
+    if is_admin:
+        options.append("🔍 عرض استمارات النازحين")
+        options.extend([
+            "✏️ تعديل بيانات الاستمارات",
+            "📦 توزيع السلال الغذائية",
+            "🤝 إدارة الكفالات والرعايات",
+            "📂 الأرشيف والمستندات",
+            "💰 الصندوق والحسابات (الوارد والمنصرف)",
+            "👥 إدارة القوى البشرية والكادر",
+            "🔐 إدارة المستخدمين وكلمات المرور",
+            "🔑 تغيير كلمة المرور",  # تم إضافة خيار تغيير كلمة المرور هنا
+            "📥 تصدير التقارير (Excel)"
+        ])
+
+    choice = st.radio("القائمة الرئيسية:", options)
+
+
 
     # تحديد القوائم المتاحة بناءً على الصلاحيات
     is_admin = (st.session_state['logged_in'] and st.session_state['role'] == "مشرف النظام")

@@ -136,12 +136,12 @@ cursor.execute('''
     ''')
 
     # ضمان إضافة حساب المشرف الافتراضي في حال عدم وجوده
-    cursor.execute(
+cursor.execute(
         "INSERT OR IGNORE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')")
 
 
     # 3. جدول المالية والإنفاق
-    cursor.execute('''
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS finance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trans_date TEXT, trans_type TEXT, category TEXT, amount REAL, statement TEXT, handler TEXT
@@ -149,7 +149,7 @@ cursor.execute('''
     ''')
 
     # 4. جدول القوى البشرية
-    cursor.execute('''
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS hr_staff (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT, role TEXT, phone TEXT, committee TEXT, status TEXT

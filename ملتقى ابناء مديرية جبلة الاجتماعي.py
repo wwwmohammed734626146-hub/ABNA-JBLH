@@ -173,7 +173,7 @@ cursor.execute('''
     ''')
 
     # 7. جدول الأرشيف والمستندات
- cursor.execute('''
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS archive (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_title TEXT, doc_type TEXT, doc_date TEXT, ref_number TEXT, details TEXT

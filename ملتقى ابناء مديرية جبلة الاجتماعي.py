@@ -157,7 +157,7 @@ cursor.execute('''
     ''')
 
     # 5. جدول توزيع السلال الغذائية
-    cursor.execute('''
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS food_baskets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             beneficiary_name TEXT, phone TEXT, basket_type TEXT, dist_date TEXT, notes TEXT
@@ -165,7 +165,7 @@ cursor.execute('''
     ''')
 
     # 6. جدول الكفالات والرعايات
-    cursor.execute('''
+ cursor.execute('''
         CREATE TABLE IF NOT EXISTS sponsorships (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             beneficiary_name TEXT, sponsor_name TEXT, sp_type TEXT, monthly_amount REAL, start_date TEXT
@@ -173,7 +173,7 @@ cursor.execute('''
     ''')
 
     # 7. جدول الأرشيف والمستندات
-    cursor.execute('''
+ cursor.execute('''
         CREATE TABLE IF NOT EXISTS archive (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_title TEXT, doc_type TEXT, doc_date TEXT, ref_number TEXT, details TEXT

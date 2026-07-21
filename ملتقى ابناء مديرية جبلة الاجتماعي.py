@@ -219,7 +219,7 @@ elif choice == "📝 تعبئة استمارة جديدة":
     st.markdown("<h1 style='text-align: center; color: #075E54;'>استمارة نزوح</h1>", unsafe_allow_html=True)
     st.write("---")
 
-    with st.form("full_refugee_form", clear_on_submit=True):
+    with st.form("full_refugee_form", clear_on_submit=False):
         st.subheader("📌 بيانات الاستمارة والترقيم")
         h1, h2, h3, h4 = st.columns(4)
         with h1: doc_number = st.text_input("الرقم:")
@@ -269,32 +269,32 @@ elif choice == "📝 تعبئة استمارة جديدة":
         with r3: relative_phone = st.text_input("رقم الجوال (القرابة):")
         with r4: family_status = st.text_input("حالة الأسرة:")
         with r5: displacement_date = st.text_input("تاريخ النزوح للأسرة:")
-        with r6: displacement_count = st.number_input("عدد مرات النزوح:", min_value=1, step=1)
+        with r6: displacement_count = st.number_input("عدد مرات النزوح:", min_value=1, value=1, step=1)
 
         st.subheader("👨👩👧👦 عدد أفراد الأسرة بالتفصيل")
         spouse_name = st.text_input("اسم الزوج / الزوجة رباعياً:")
 
         st.markdown("**توزيع الأفراد الذكور:**")
         m1, m2, m3, m4, m5 = st.columns(5)
-        with m1: m_under_1 = st.number_input("ذكور أقل من سنة:", min_value=0, step=1)
-        with m2: m_1_5 = st.number_input("ذكور 1-5 سنوات:", min_value=0, step=1)
-        with m3: m_6_17 = st.number_input("ذكور 6-17 سنة:", min_value=0, step=1)
-        with m4: m_18_59 = st.number_input("ذكور 18-59 سنة:", min_value=0, step=1)
-        with m5: m_60_plus = st.number_input("ذكور 60+ سنة:", min_value=0, step=1)
+        with m1: m_under_1 = st.number_input("ذكور أقل من سنة:", min_value=0, value=0, step=1)
+        with m2: m_1_5 = st.number_input("ذكور 1-5 سنوات:", min_value=0, value=0, step=1)
+        with m3: m_6_17 = st.number_input("ذكور 6-17 سنة:", min_value=0, value=0, step=1)
+        with m4: m_18_59 = st.number_input("ذكور 18-59 سنة:", min_value=0, value=0, step=1)
+        with m5: m_60_plus = st.number_input("ذكور 60+ سنة:", min_value=0, value=0, step=1)
 
         st.markdown("**توزيع الأفراد الإناث:**")
         f1, f2, f3, f4, f5 = st.columns(5)
-        with f1: f_under_1 = st.number_input("إناث أقل من سنة:", min_value=0, step=1)
-        with f2: f_1_5 = st.number_input("إناث 1-5 سنوات:", min_value=0, step=1)
-        with f3: f_6_17 = st.number_input("إناث 6-17 سنة:", min_value=0, step=1)
-        with f4: f_18_59 = st.number_input("إناث 18-59 سنة:", min_value=0, step=1)
-        with f5: f_60_plus = st.number_input("إناث 60+ سنة:", min_value=0, step=1)
+        with f1: f_under_1 = st.number_input("إناث أقل من سنة:", min_value=0, value=0, step=1)
+        with f2: f_1_5 = st.number_input("إناث 1-5 سنوات:", min_value=0, value=0, step=1)
+        with f3: f_6_17 = st.number_input("إناث 6-17 سنة:", min_value=0, value=0, step=1)
+        with f4: f_18_59 = st.number_input("إناث 18-59 سنة:", min_value=0, value=0, step=1)
+        with f5: f_60_plus = st.number_input("إناث 60+ سنة:", min_value=0, value=0, step=1)
 
         st.markdown("**الإجماليات والحالات الخاصة:**")
         tot1, tot2, tot3 = st.columns(3)
-        with tot1: total_family = st.number_input("إجمالي أفراد الأسرة:", min_value=1, step=1)
-        with tot2: disabled_count = st.number_input("عدد المعاقين:", min_value=0, step=1)
-        with tot3: sponsored_count = st.number_input("عدد المكفولين:", min_value=0, step=1)
+        with tot1: total_family = st.number_input("إجمالي أفراد الأسرة:", min_value=1, value=1, step=1)
+        with tot2: disabled_count = st.number_input("عدد المعاقين:", min_value=0, value=0, step=1)
+        with tot3: sponsored_count = st.number_input("عدد المكفولين:", min_value=0, value=0, step=1)
 
         st.subheader("🏠 بيانات السكن الحالي")
         h_col1, h_col2, h_col3, h_col4, h_col5, h_col6 = st.columns(6)
@@ -330,57 +330,46 @@ elif choice == "📝 تعبئة استمارة جديدة":
         submit_btn = st.form_submit_button("💾 حفظ الاستمارة كاملة")
 
         if submit_btn:
-            if head_name:
-                conn = sqlite3.connect(DB_NAME)
-                cursor = conn.cursor()
-                cursor.execute('''
-                    INSERT INTO refugees_full (
-                        doc_number, doc_date, doc_hijri, attachments,
-                        head_name, phone, edu_level, dob, id_number,
-                        job_type, employer, qualification, specialization,
-                        blood_type, health_status, disease_type, id_issue_place,
-                        orig_gov, orig_dir, orig_sub, orig_village,
-                        prev_gov, prev_dir, prev_sub, prev_village,
-                        relative_name, relative_relation, relative_phone,
-                        family_status, displacement_date, displacement_count,
-                        spouse_name,
-                        m_under_1, m_1_5, m_6_17, m_18_59, m_60_plus,
-                        f_under_1, f_1_5, f_6_17, f_18_59, f_60_plus,
-                        total_family, disabled_count, sponsored_count,
-                        house_num, house_type, house_ownership, landlord_name,
-                        house_gov, landlord_phone,
-                        need_shelter, need_supplies, need_water, need_food,
-                        need_medical, need_school, need_bathrooms,
-                        registered_wfp, current_org, other_needs,
-                        delegate_name, delegate_sub
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                ''', (
-                    doc_number, doc_date, doc_hijri, attachments,
-                    head_name, phone, edu_level, dob, id_number,
-                    job_type, employer, qualification, specialization,
-                    blood_type, health_status, disease_type, id_issue_place,
-                    orig_gov, orig_dir, orig_sub, orig_village,
-                    prev_gov, prev_dir, prev_sub, prev_village,
-                    relative_name, relative_relation, relative_phone,
-                    family_status, displacement_date, displacement_count,
-                    spouse_name,
-                    m_under_1, m_1_5, m_6_17, m_18_59, m_60_plus,
-                    f_under_1, f_1_5, f_6_17, f_18_59, f_60_plus,
-                    total_family, disabled_count, sponsored_count,
-                    house_num, house_type, house_ownership, landlord_name,
-                    house_gov, landlord_phone,
-                    "نعم" if need_shelter else "لا", "نعم" if need_supplies else "لا",
-                    "نعم" if need_water else "لا", "نعم" if need_food else "لا",
-                    "نعم" if need_medical else "لا", "نعم" if need_school else "لا",
-                    "نعم" if need_bathrooms else "لا",
-                    registered_wfp, current_org, other_needs,
-                    delegate_name, delegate_sub
-                ))
-                conn.commit()
-                conn.close()
-                st.success(f"✔️ تم حفظ استمارة ({head_name}) بنجاح!")
+            if head_name and head_name.strip() != "":
+                try:
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    
+                    data_dict = {
+                        "doc_number": doc_number, "doc_date": doc_date, "doc_hijri": doc_hijri, "attachments": attachments,
+                        "head_name": head_name, "phone": phone, "edu_level": edu_level, "dob": dob, "id_number": id_number,
+                        "job_type": job_type, "employer": employer, "qualification": qualification, "specialization": specialization,
+                        "blood_type": blood_type, "health_status": health_status, "disease_type": disease_type, "id_issue_place": id_issue_place,
+                        "orig_gov": orig_gov, "orig_dir": orig_dir, "orig_sub": orig_sub, "orig_village": orig_village,
+                        "prev_gov": prev_gov, "prev_dir": prev_dir, "prev_sub": prev_sub, "prev_village": prev_village,
+                        "relative_name": relative_name, "relative_relation": relative_relation, "relative_phone": relative_phone,
+                        "family_status": family_status, "displacement_date": displacement_date, "displacement_count": int(displacement_count),
+                        "spouse_name": spouse_name,
+                        "m_under_1": int(m_under_1), "m_1_5": int(m_1_5), "m_6_17": int(m_6_17), "m_18_59": int(m_18_59), "m_60_plus": int(m_60_plus),
+                        "f_under_1": int(f_under_1), "f_1_5": int(f_1_5), "f_6_17": int(f_6_17), "f_18_59": int(f_18_59), "f_60_plus": int(f_60_plus),
+                        "total_family": int(total_family), "disabled_count": int(disabled_count), "sponsored_count": int(sponsored_count),
+                        "house_num": house_num, "house_type": house_type, "house_ownership": house_ownership, "landlord_name": landlord_name,
+                        "house_gov": house_gov, "landlord_phone": landlord_phone,
+                        "need_shelter": "نعم" if need_shelter else "لا", "need_supplies": "نعم" if need_supplies else "لا",
+                        "need_water": "نعم" if need_water else "لا", "need_food": "نعم" if need_food else "لا",
+                        "need_medical": "نعم" if need_medical else "لا", "need_school": "نعم" if need_school else "لا",
+                        "need_bathrooms": "نعم" if need_bathrooms else "لا",
+                        "registered_wfp": registered_wfp, "current_org": current_org, "other_needs": other_needs,
+                        "delegate_name": delegate_name, "delegate_sub": delegate_sub
+                    }
+
+                    columns = ', '.join(data_dict.keys())
+                    placeholders = ', '.join(['?'] * len(data_dict))
+                    query = f"INSERT INTO refugees_full ({columns}) VALUES ({placeholders})"
+
+                    cursor.execute(query, list(data_dict.values()))
+                    conn.commit()
+                    conn.close()
+                    st.success(f"✔️ تم حفظ استمارة ({head_name}) بنجاح في قاعدة البيانات!")
+                except Exception as e:
+                    st.error(f"❌ حدث خطأ أثناء الحفظ: {e}")
             else:
-                st.error("❌ يرجى إدخال اسم رب الأسرة على الأقل!")
+                st.error("❌ يرجى كتابة اسم رب الأسرة على الأقل للتمكن من الحفظ!")
 
 # --- 3. تغيير كلمة المرور ---
 elif choice == "🔑 تغيير كلمة المرور":

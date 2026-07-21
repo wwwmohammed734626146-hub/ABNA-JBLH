@@ -165,7 +165,7 @@ cursor.execute('''
     ''')
 
     # 6. جدول الكفالات والرعايات
- cursor.execute('''
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS sponsorships (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             beneficiary_name TEXT, sponsor_name TEXT, sp_type TEXT, monthly_amount REAL, start_date TEXT

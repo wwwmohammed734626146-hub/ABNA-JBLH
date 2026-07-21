@@ -32,13 +32,21 @@ def init_db():
 
     # 1. أوامر إنشاء الجداول العادية الموجودة لديك
     cursor.execute('''
-        CREATE TABLE IF NOT EXISTS refugees_full (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
-            head_name TEXT, phone TEXT, edu_level TEXT, dob TEXT, id_number TEXT,
-            ...
-        )
+    CREATE TABLE IF NOT EXISTS refugees_full (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_number TEXT,
+    doc_date TEXT,
+    doc_hijri TEXT,
+    attachments TEXT,
+    head_name TEXT,
+    phone TEXT,
+    edu_level TEXT,
+    dob TEXT,
+    id_number TEXT
+    )
     ''')
+
+
 
     # 2. 👈 ألصق الكود الجديد هنا مباشرة 👇
     cursor.execute("PRAGMA table_info(refugees_full)")

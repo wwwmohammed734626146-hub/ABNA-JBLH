@@ -179,8 +179,7 @@ cursor.execute('''
             doc_title TEXT, doc_type TEXT, doc_date TEXT, ref_number TEXT, details TEXT
         )
     ''')
-
- conn.commit()
+conn.commit()
 conn.close()
 
 

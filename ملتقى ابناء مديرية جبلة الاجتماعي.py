@@ -30,6 +30,41 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
+    # 1. أوامر إنشاء الجداول العادية الموجودة لديك
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS refugees_full (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
+            head_name TEXT, phone TEXT, edu_level TEXT, dob TEXT, id_number TEXT,
+            ...
+        )
+    ''')
+
+    # 2. 👈 ألصق الكود الجديد هنا مباشرة 👇
+    cursor.execute("PRAGMA table_info(refugees_full)")
+    existing_columns = [column[1] for column in cursor.fetchall()]
+
+    required_columns = {
+        "doc_number": "TEXT",
+        "doc_date": "TEXT",
+        "doc_hijri": "TEXT",
+        "attachments": "TEXT",
+        "head_name": "TEXT",
+        "phone": "TEXT",
+        "edu_level": "TEXT",
+        "dob": "TEXT",
+        "id_number": "TEXT"
+    }
+
+    for col_name, col_type in required_columns.items():
+        if col_name not in existing_columns:
+            cursor.execute(f"ALTER TABLE refugees_full ADD COLUMN {col_name} {col_type};")
+
+    # 3. حفظ والتأكيد
+    conn.commit()
+    conn.close()
+
+
     # 1. جدول النازحين والمستفيدين (محدث ليشمل كافة حقول الاستمارة الرسمية)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS refugees_full (

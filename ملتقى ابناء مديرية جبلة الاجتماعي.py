@@ -30,8 +30,88 @@ def init_db():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # 1. إنشاء جدول النازحين والمستفيدين (شامل لكافة حقول الاستمارة)
+    # 1. أوامر إنشاء الجداول العادية الموجودة لديك
     cursor.execute('''
+    CREATE TABLE IF NOT EXISTS refugees_full (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    doc_number TEXT,
+    doc_date TEXT,
+    doc_hijri TEXT,
+    attachments TEXT,
+    head_name TEXT,
+    phone TEXT,
+    edu_level TEXT,
+    dob TEXT,
+    id_number TEXT
+    )
+    ''')
+
+
+
+    # 2. 👈 ألصق الكود الجديد هنا مباشرة 👇
+    cursor.execute("PRAGMA table_info(refugees_full)")
+    existing_columns = [column[1] for column in cursor.fetchall()]
+
+    required_columns = {
+        "doc_number": "TEXT",
+        "doc_date": "TEXT",
+        "doc_hijri": "TEXT",
+        "attachments": "TEXT",
+        "head_name": "TEXT",
+        "phone": "TEXT",
+        "edu_level": "TEXT",
+        "dob": "TEXT",
+        "id_number": "TEXT"
+    }
+
+    for col_name, col_type in required_columns.items():
+        if col_name not in existing_columns:
+            cursor.execute(f"ALTER TABLE refugees_full ADD COLUMN {col_name} {col_type};")
+
+    # 3. حفظ والتأكيد
+    conn.commit()
+    conn.close()
+# 1. إنشاء الجدول إن لم يكن موجوداً
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS refugees_full (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
+            head_name TEXT, phone TEXT, edu_level TEXT, dob TEXT, id_number TEXT,
+            job_type TEXT, employer TEXT, qualification TEXT, specialization TEXT,
+            blood_type TEXT, health_status TEXT, disease_type TEXT, id_issue_place TEXT,
+            orig_gov TEXT, orig_dir TEXT, orig_sub TEXT, orig_village TEXT,
+            prev_gov TEXT, prev_dir TEXT, prev_sub TEXT, prev_village TEXT,
+            relative_name TEXT, relative_relation TEXT, relative_phone TEXT,
+            family_status TEXT, displacement_date TEXT, displacement_count INTEGER
+        )
+    ''')
+
+    # 2. فحص وتحديث الأعمدة الناقصة تلقائياً
+    cursor.execute("PRAGMA table_info(refugees_full)")
+    existing_columns = [column[1] for column in cursor.fetchall()]
+
+    required_columns = {
+        "doc_number": "TEXT", "doc_date": "TEXT", "doc_hijri": "TEXT", 
+        "attachments": "TEXT", "head_name": "TEXT", "phone": "TEXT", 
+        "edu_level": "TEXT", "dob": "TEXT", "id_number": "TEXT"
+    }
+
+    for col_name, col_type in required_columns.items():
+        if col_name not in existing_columns:
+            cursor.execute(f"ALTER TABLE refugees_full ADD COLUMN {col_name} {col_type};")
+
+    # 3. حفظ وإغلاق الاتصال
+    conn.commit()
+    conn.close()
+
+# 4. استدعاء الدالة عند بداية التشغيل (في أول السطر تماماً بدون مسافات)
+init_db()
+
+
+
+
+    # 1. جدول النازحين والمستفيدين (محدث ليشمل كافة حقول الاستمارة الرسمية)
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS refugees_full (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
@@ -55,77 +135,62 @@ def init_db():
         )
     ''')
 
-    # 2. فحص وتحديث الأعمدة الناقصة تلقائياً
-    cursor.execute("PRAGMA table_info(refugees_full)")
-    existing_columns = [column[1] for column in cursor.fetchall()]
-
-    required_columns = {
-        "doc_number": "TEXT", "doc_date": "TEXT", "doc_hijri": "TEXT", 
-        "attachments": "TEXT", "head_name": "TEXT", "phone": "TEXT", 
-        "edu_level": "TEXT", "dob": "TEXT", "id_number": "TEXT"
-    }
-
-    for col_name, col_type in required_columns.items():
-        if col_name not in existing_columns:
-            cursor.execute(f"ALTER TABLE refugees_full ADD COLUMN {col_name} {col_type};")
-
-    # 3. جدول المستخدمين وكلمات المرور
-    cursor.execute('''
+        # 2. جدول المستخدمين وكلمات المرور
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE, password TEXT, role TEXT, full_name TEXT
         )
     ''')
 
-    # إضافة حساب المشرف الافتراضي في حال عدم وجوده
-    cursor.execute(
-        "INSERT OR IGNORE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')"
-    )
+    # ضمان إضافة حساب المشرف الافتراضي في حال عدم وجوده
+cursor.execute(
+        "INSERT OR IGNORE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')")
 
-    # 4. جدول المالية والإنفاق
-    cursor.execute('''
+
+    # 3. جدول المالية والإنفاق
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS finance (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trans_date TEXT, trans_type TEXT, category TEXT, amount REAL, statement TEXT, handler TEXT
         )
     ''')
 
-    # 5. جدول القوى البشرية
-    cursor.execute('''
+    # 4. جدول القوى البشرية
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS hr_staff (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT, role TEXT, phone TEXT, committee TEXT, status TEXT
         )
     ''')
 
-    # 6. جدول توزيع السلال الغذائية
-    cursor.execute('''
+    # 5. جدول توزيع السلال الغذائية
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS food_baskets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             beneficiary_name TEXT, phone TEXT, basket_type TEXT, dist_date TEXT, notes TEXT
         )
     ''')
 
-    # 7. جدول الكفالات والرعايات
-    cursor.execute('''
+    # 6. جدول الكفالات والرعايات
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS sponsorships (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             beneficiary_name TEXT, sponsor_name TEXT, sp_type TEXT, monthly_amount REAL, start_date TEXT
         )
     ''')
 
-    # 8. جدول الأرشيف والمستندات
-    cursor.execute('''
+    # 7. جدول الأرشيف والمستندات
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS archive (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_title TEXT, doc_type TEXT, doc_date TEXT, ref_number TEXT, details TEXT
         )
     ''')
+conn.commit()
+conn.close()
 
-    conn.commit()
-    conn.close()
 
-# تهيئة قاعدة البيانات
 init_db()
 
 # --- نظام تسجيل الدخول والجلسات ---
@@ -381,7 +446,305 @@ elif choice == "📝 تعبئة استمارة جديدة":
                 ))
                 conn.commit()
                 conn.close()
-                st.success(f"✔️ تم حفظ استمارة ({head_name}) بنجاح!")
+                st.success(f"✔️ تم حفظ استمارة المستفيد: ( {head_name} ) بنجاح!")
             else:
-                st.error("❌ يرجى إدخال اسم رب الأسرة على الأقل!")
+                st.error("❌ يرجى كتابة اسم رب الأسرة.")
+# --- قسم جديد: تغيير كلمة المرور ---
+elif choice == "🔑 تغيير كلمة المرور":
+    st.markdown("<h1>🔑 تغيير كلمة المرور</h1>", unsafe_allow_html=True)
+    st.write("---")
+
+    with st.form("change_password_form"):
+        st.subheader(f"تغيير كلمة المرور للحساب: **{st.session_state['username']}**")
+        old_pass = st.text_input("كلمة المرور الحالية:", type="password")
+        new_pass = st.text_input("كلمة المرور الجديدة:", type="password")
+        confirm_pass = st.text_input("تأكيد كلمة المرور الجديدة:", type="password")
+
+        update_btn = st.form_submit_button("🔒 تحديث كلمة المرور")
+
+        if update_btn:
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
+            cursor.execute("SELECT password FROM users WHERE username = ?", (st.session_state['username'],))
+            current_db_pass = cursor.fetchone()
+
+            if not current_db_pass or current_db_pass[0] != old_pass:
+                st.error("❌ كلمة المرور الحالية غير صحيحة.")
+            elif new_pass != confirm_pass:
+                st.error("❌ كلمة المرور الجديدة وتأكيدها غير متطابقين.")
+            elif len(new_pass) < 4:
+                st.warning("⚠️ يرجى أدخال كلمة مرور أطول (4 خانات على الأقل).")
+            else:
+                cursor.execute("UPDATE users SET password = ? WHERE username = ?",
+                               (new_pass, st.session_state['username']))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم تغيير كلمة المرور بنجاح!")
+
+
+# --- 3. عرض البيانات (محمي ومتاح للمشرف فقط) ---
+elif choice == "🔍 عرض استمارات النازحين":
+    st.markdown("<h1>🔍 قاعدة بيانات الاستمارات المسجلة</h1>", unsafe_allow_html=True)
+    st.write("---")
+    conn = sqlite3.connect(DB_NAME)
+    df = pd.read_sql_query(
+        "SELECT id as 'ت', doc_number as 'رقم الاستمارة', head_name as 'اسم رب الأسرة', phone as 'رقم الهاتف', orig_gov as 'المحافظة الأصلية', total_family as 'عدد الأفراد' FROM refugees_full",
+        conn)
+    conn.close()
+    st.dataframe(df, use_container_width=True) if not df.empty else st.info("لا توجد استمارات مسجلة حالياً.")
+
+# --- 4. قسم توزيع السلال الغذائية ---
+elif choice == "📦 توزيع السلال الغذائية":
+    st.markdown("<h1>📦 قسم إدارة وتوزيع السلال الغذائية</h1>", unsafe_allow_html=True)
+    st.write("---")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### ➕ تسجيل عملية تسليم")
+        with st.form("food_form", clear_on_submit=True):
+            b_name = st.text_input("اسم المستفيد:")
+            b_phone = st.text_input("رقم الهاتف:")
+            b_type = st.selectbox("نوع السلة / المساعدة:",
+                                  ["سلة غذائية مكتملة", "سلة غذائية طارئة", "قسيمة شراء", "مساعدة نقدية"])
+            d_date = st.text_input("تاريخ التسليم:", value=datetime.now().strftime("%Y-%m-%d"))
+            notes = st.text_area("ملاحظات:")
+            if st.form_submit_button("💾 توثيق التسليم"):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO food_baskets (beneficiary_name, phone, basket_type, dist_date, notes) VALUES (?,?,?,?,?)",
+                    (b_name, b_phone, b_type, d_date, notes))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم تسليم وتوثيق المساعدة بنجاح!")
+    with col2:
+        st.markdown("### 📋 سجل التوزيع السلس")
+        conn = sqlite3.connect(DB_NAME)
+        df_f = pd.read_sql_query(
+            "SELECT id as 'ت', beneficiary_name as 'المستفيد', phone as 'الهاتف', basket_type as 'نوع السلة', dist_date as 'التاريخ' FROM food_baskets",
+            conn)
+        conn.close()
+        st.dataframe(df_f, use_container_width=True) if not df_f.empty else st.info("لا توجد سجلات تسليم بعد.")
+
+# --- 5. قسم الكفالات والرعايات ---
+elif choice == "🤝 إدارة الكفالات والرعايات":
+    st.markdown("<h1>🤝 قسم الكفالات والرعايات الشاملة</h1>", unsafe_allow_html=True)
+    st.write("---")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### ➕ إضافة كفالة جديدة")
+        with st.form("sp_form", clear_on_submit=True):
+            ben_name = st.text_input("اسم المكفول (يتيم/أسرة):")
+            spo_name = st.text_input("اسم الكافل / الداعم:")
+            sp_type = st.selectbox("نوع الكفالة:",
+                                   ["كفالة يتيم", "كفالة أسرة متعففة", "كفالة طالب علم", "كفالة علاجية"])
+            m_amount = st.number_input("المبلغ الشهري (ر.ي):", min_value=0.0, step=5000.0)
+            s_date = st.text_input("تاريخ بداية الكفالة:", value=datetime.now().strftime("%Y-%m-%d"))
+            if st.form_submit_button("💾 تسجيل الكفالة"):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO sponsorships (beneficiary_name, sponsor_name, sp_type, monthly_amount, start_date) VALUES (?,?,?,?,?)",
+                    (ben_name, spo_name, sp_type, m_amount, s_date))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم تسجيل الكفالة بنجاح!")
+    with col2:
+        st.markdown("### 📋 قائمة المكفولين والكفلاء")
+        conn = sqlite3.connect(DB_NAME)
+        df_sp = pd.read_sql_query(
+            "SELECT id as 'ت', beneficiary_name as 'المكفول', sponsor_name as 'الكافل', sp_type as 'النوع', monthly_amount as 'المبلغ الشهري' FROM sponsorships",
+            conn)
+        conn.close()
+        st.dataframe(df_sp, use_container_width=True) if not df_sp.empty else st.info("لا توجد كفالات مسجلة حالياً.")
+
+# --- 6. قسم الأرشيف والمستندات ---
+elif choice == "📂 الأرشيف والمستندات":
+    st.markdown("<h1>📂 قسم الأرشيف والمستندات الرقمية</h1>", unsafe_allow_html=True)
+    st.write("---")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### ➕ أرشفة وثيقة جديدة")
+        with st.form("arch_form", clear_on_submit=True):
+            doc_title = st.text_input("عنوان الوثيقة/الخطاب:")
+            doc_type = st.selectbox("نوع الوثيقة:",
+                                    ["مذكرة رسمية", "محضر اجتماع", "عقد/اتفاقية", "تقرير دوري", "وثيقة شخصية"])
+            ref_num = st.text_input("رقم الإشارة/ المرجع:")
+            doc_dt = st.text_input("تاريخ الوثيقة:", value=datetime.now().strftime("%Y-%m-%d"))
+            details = st.text_area("تفاصيل / ملخص الوثيقة:")
+            if st.form_submit_button("💾 أرشفة المستند"):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO archive (doc_title, doc_type, doc_date, ref_number, details) VALUES (?,?,?,?,?)",
+                    (doc_title, doc_type, doc_dt, ref_num, details))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم أرشفة المستند بنجاح!")
+    with col2:
+        st.markdown("### 📋 الأرشيف الإلكتروني")
+        conn = sqlite3.connect(DB_NAME)
+        df_ar = pd.read_sql_query(
+            "SELECT id as 'ت', doc_title as 'العنوان', doc_type as 'النوع', ref_number as 'رقم المرجع', doc_date as 'التاريخ' FROM archive",
+            conn)
+        conn.close()
+        st.dataframe(df_ar, use_container_width=True) if not df_ar.empty else st.info("الأرشيف فارغ حالياً.")
+
+# --- 7. تعديل البيانات ---
+elif choice == "✏️ تعديل بيانات الاستمارات":
+    st.markdown("<h1>✏️ تعديل بيانات استمارة مسجلة</h1>", unsafe_allow_html=True)
+    st.write("---")
+    conn = sqlite3.connect(DB_NAME)
+    refugees = pd.read_sql_query("SELECT id, head_name, doc_number FROM refugees_full", conn)
+    conn.close()
+
+    if not refugees.empty:
+        refugee_list = [f"{row['id']} - {row['head_name']} (استمارة: {row['doc_number']})" for _, row in
+                        refugees.iterrows()]
+        selected_refugee = st.selectbox("اختر المستفيد للتعديل:", refugee_list)
+        selected_id = int(selected_refugee.split(" - ")[0])
+
+        conn = sqlite3.connect(DB_NAME)
+        cursor = conn.cursor()
+        cursor.execute("SELECT head_name, phone, doc_number, total_family FROM refugees_full WHERE id = ?",
+                       (selected_id,))
+        ref_data = cursor.fetchone()
+        conn.close()
+
+        with st.form("edit_form"):
+            new_name = st.text_input("اسم رب الأسرة:", value=ref_data[0])
+            new_phone = st.text_input("رقم الهاتف:", value=ref_data[1])
+            new_doc = st.text_input("رقم الاستمارة:", value=ref_data[2])
+            new_family = st.number_input("عدد الأفراد:", value=ref_data[3], min_value=1)
+
+            if st.form_submit_button("🔄 حفظ التعديلات"):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE refugees_full SET head_name=?, phone=?, doc_number=?, total_family=? WHERE id=?",
+                               (new_name, new_phone, new_doc, new_family, selected_id))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم تحديث البيانات بنجاح!")
+    else:
+        st.info("لا توجد استمارات مسجلة للتعديل.")
+
+# --- 8. الصندوق والحسابات ---
+elif choice == "💰 الصندوق والحسابات (الوارد والمنصرف)":
+    st.markdown("<h1>💰 إدارة الصندوق والمالية (الوارد والمنصرف)</h1>", unsafe_allow_html=True)
+    st.write("---")
+    tab1, tab2 = st.tabs(["➕ تسجيل حركة مالية", "📜 دفتر الصندوق"])
+    with tab1:
+        with st.form("finance_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                trans_type = st.selectbox("نوع الحركة المالية:", ["وارد (إيراد)", "منصرف (مصروف)"])
+                amount = st.number_input("المبلغ (بالريال اليمني):", min_value=1.0, step=1000.0)
+                category = st.text_input("البند:")
+            with col2:
+                trans_date = st.text_input("التاريخ:", value=datetime.now().strftime("%Y-%m-%d"))
+                handler = st.text_input("المسؤول / أمين الصندوق:")
+                statement = st.text_area("البيان / التفاصيل:")
+            if st.form_submit_button("💾 قيد الحركة"):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute(
+                    "INSERT INTO finance (trans_date, trans_type, category, amount, statement, handler) VALUES (?,?,?,?,?,?)",
+                    (trans_date, trans_type, category, amount, statement, handler))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم تسجيل الحركة المالية!")
+    with tab2:
+        conn = sqlite3.connect(DB_NAME)
+        fin_df = pd.read_sql_query(
+            "SELECT id as 'ت', trans_date as 'التاريخ', trans_type as 'النوع', category as 'البند', amount as 'المبلغ', statement as 'البيان' FROM finance ORDER BY id DESC",
+            conn)
+        conn.close()
+        st.dataframe(fin_df, use_container_width=True) if not fin_df.empty else st.info("لا توجد حركات تسجّل بعد.")
+
+# --- 9. إدارة القوى البشرية ---
+elif choice == "👥 إدارة القوى البشرية والكادر":
+    st.markdown("<h1>👥 إدارة الكادر الإداري والمتطوعين</h1>", unsafe_allow_html=True)
+    st.write("---")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        with st.form("hr_form", clear_on_submit=True):
+            full_name = st.text_input("اسم العضو / الموظف:")
+            role = st.text_input("الوظيفة:")
+            phone = st.text_input("التلفون:")
+            committee = st.selectbox("اللجنة:",
+                                     ["اللجنة الاجتماعية", "اللجنة المالية", "اللجنة الإعلامية", "الإدارة العامة"])
+            status = st.selectbox("الحالة:", ["نشط", "غير نشط"])
+            if st.form_submit_button("💾 إضافة"):
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
+                cursor.execute("INSERT INTO hr_staff (full_name, role, phone, committee, status) VALUES (?,?,?,?,?)",
+                               (full_name, role, phone, committee, status))
+                conn.commit()
+                conn.close()
+                st.success("✔️ تم التنزيل بنجاح!")
+    with col2:
+        conn = sqlite3.connect(DB_NAME)
+        hr_df = pd.read_sql_query(
+            "SELECT id as 'ت', full_name as 'الاسم', role as 'الوظيفة', phone as 'الهاتف', committee as 'اللجنة', status as 'الحالة' FROM hr_staff",
+            conn)
+        conn.close()
+        st.dataframe(hr_df, use_container_width=True) if not hr_df.empty else st.info("لا يوجد أعضاء مسجلون بعد.")
+
+# --- 10. إدارة المستخدمين وكلمات المرور ---
+elif choice == "🔐 إدارة المستخدمين وكلمات المرور":
+    st.markdown("<h1>🔐 إدارة حسابات المستخدمين وصلاحيات النظام</h1>", unsafe_allow_html=True)
+    st.write("---")
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        st.markdown("### ➕ إضافة مستخدم جديد")
+        with st.form("new_user_form", clear_on_submit=True):
+            new_u = st.text_input("اسم المستخدم (Username):")
+            new_p = st.text_input("كلمة المرور (Password):")
+            new_fn = st.text_input("الاسم الكامل:")
+            new_r = st.selectbox("الصلاحية:", ["مدخل بيانات", "مشرف النظام"])
+            if st.form_submit_button("💾 إضافة المستخدم"):
+                if new_u and new_p:
+                    conn = sqlite3.connect(DB_NAME)
+                    cursor = conn.cursor()
+                    try:
+                        cursor.execute("INSERT INTO users (username, password, role, full_name) VALUES (?,?,?,?)",
+                                       (new_u, new_p, new_r, new_fn))
+                        conn.commit()
+                        st.success("✔️ تم إضافة الحساب بنجاح!")
+                    except sqlite3.IntegrityError:
+                        st.error("❌ اسم المستخدم موجود بالفعل.")
+                    conn.close()
+                else:
+                    st.error("يرجى ملء اسم المستخدم وكلمة المرور.")
+    with col2:
+        st.markdown("### 📋 قائمة الحسابات المعتمدة")
+        conn = sqlite3.connect(DB_NAME)
+        users_table = pd.read_sql_query("SELECT id as 'ت', username as 'اسم المستخدم', role as 'الصلاحية', full_name as 'الاسم الكامل' FROM users", conn)
+        conn.close()
+        st.dataframe(users_table, use_container_width=True)
+
+# --- 11. تصدير التقارير إلى Excel ---
+elif choice == "📥 تصدير التقارير (Excel)":
+    st.markdown("<h1>📥 تصدير البيانات والتقارير الشاملة إلى Excel</h1>", unsafe_allow_html=True)
+    st.write("---")
+    
+    conn = sqlite3.connect(DB_NAME)
+    
+    # تجهيز ملف Excel يحتوي على كافة الجداول بصفحات متعددة
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        pd.read_sql_query("SELECT * FROM refugees_full", conn).to_excel(writer, sheet_name='النازحين والمستفيدين', index=False)
+        pd.read_sql_query("SELECT * FROM finance", conn).to_excel(writer, sheet_name='المالية والصندوق', index=False)
+        pd.read_sql_query("SELECT * FROM food_baskets", conn).to_excel(writer, sheet_name='السلال الغذائية', index=False)
+        pd.read_sql_query("SELECT * FROM sponsorships", conn).to_excel(writer, sheet_name='الكفالات والرعايات', index=False)
+        pd.read_sql_query("SELECT * FROM hr_staff", conn).to_excel(writer, sheet_name='الكادر الإداري', index=False)
+        pd.read_sql_query("SELECT * FROM archive", conn).to_excel(writer, sheet_name='الأرشيف', index=False)
+    
+    conn.close()
+    
+    st.download_button(
+        label="📥 تحميل تقرير القاعدة الشاملة (Excel)",
+        data=output.getvalue(),
+        file_name=f"تقرير_ملتقى_جبلة_{datetime.now().strftime('%Y_%m_%d')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )	
 

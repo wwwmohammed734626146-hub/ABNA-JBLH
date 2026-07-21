@@ -103,7 +103,7 @@ init_db()
 
 
     # 1. جدول النازحين والمستفيدين (محدث ليشمل كافة حقول الاستمارة الرسمية)
-    cursor.execute('''
+cursor.execute('''
         CREATE TABLE IF NOT EXISTS refugees_full (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,

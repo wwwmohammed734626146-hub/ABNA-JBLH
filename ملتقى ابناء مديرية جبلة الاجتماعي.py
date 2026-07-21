@@ -55,7 +55,7 @@ def init_db():
         )
     ''')
 
-    # 2. جدول المستخدمين وكلمات المرور
+        # 2. جدول المستخدمين وكلمات المرور
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,9 +63,10 @@ def init_db():
         )
     ''')
 
-    # ضمان إضافة أو تحديث حساب المشرف الافتراضي مباشرة
+    # ضمان إضافة حساب المشرف الافتراضي في حال عدم وجوده
     cursor.execute(
-        "INSERT OR REPLACE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')")
+        "INSERT OR IGNORE INTO users (id, username, password, role, full_name) VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')")
+
 
     # 3. جدول المالية والإنفاق
     cursor.execute('''

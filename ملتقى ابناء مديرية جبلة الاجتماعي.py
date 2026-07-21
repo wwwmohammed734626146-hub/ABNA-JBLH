@@ -163,6 +163,8 @@ with st.sidebar:
     is_admin = (st.session_state['logged_in'] and st.session_state['role'] == "مشرف النظام")
 
     options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
+    if st.session_state['logged_in']:
+        options.append("🔑 تغيير كلمة المرور")  # متاحة لأي مستخدم مسجل دخوله
 
     # إضافة خيار عرض الاستمارات فقط للمشرف، بالإضافة لباقي القوائم المتقدمة
     if is_admin:
@@ -311,7 +313,7 @@ elif choice == "📝 تعبئة استمارة جديدة":
         st.subheader("📝 التوقيعات والاعتمادات")
         sig1, sig2 = st.columns(2)
         with sig1: delegate_name = st.text_input("اسم مندوب العزلة:")
-        with sig2: delegate_sub = st.text_input("اسم العزلة للمندوب:")
+        with sig2: delegate_sub = st.text_input("اسم رئيس الملتقى ابراهيم الشرعبي:")
 
         st.write("---")
         submit_btn = st.form_submit_button("💾 حفظ الاستمارة كاملة")

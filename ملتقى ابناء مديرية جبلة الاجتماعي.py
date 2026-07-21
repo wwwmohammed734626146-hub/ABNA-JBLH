@@ -63,10 +63,42 @@ def init_db():
     # 3. حفظ والتأكيد
     conn.commit()
     conn.close()
-DB_NAME = "database.db"  # أو اسمها في كودك
+# 1. إنشاء الجدول إن لم يكن موجوداً
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS refugees_full (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
+            head_name TEXT, phone TEXT, edu_level TEXT, dob TEXT, id_number TEXT,
+            job_type TEXT, employer TEXT, qualification TEXT, specialization TEXT,
+            blood_type TEXT, health_status TEXT, disease_type TEXT, id_issue_place TEXT,
+            orig_gov TEXT, orig_dir TEXT, orig_sub TEXT, orig_village TEXT,
+            prev_gov TEXT, prev_dir TEXT, prev_sub TEXT, prev_village TEXT,
+            relative_name TEXT, relative_relation TEXT, relative_phone TEXT,
+            family_status TEXT, displacement_date TEXT, displacement_count INTEGER
+        )
+    ''')
 
-# تشغيل التحديث التلقائي للهيكل عند فتح التطبيق
-init_and_migrate_db()
+    # 2. فحص وتحديث الأعمدة الناقصة تلقائياً
+    cursor.execute("PRAGMA table_info(refugees_full)")
+    existing_columns = [column[1] for column in cursor.fetchall()]
+
+    required_columns = {
+        "doc_number": "TEXT", "doc_date": "TEXT", "doc_hijri": "TEXT", 
+        "attachments": "TEXT", "head_name": "TEXT", "phone": "TEXT", 
+        "edu_level": "TEXT", "dob": "TEXT", "id_number": "TEXT"
+    }
+
+    for col_name, col_type in required_columns.items():
+        if col_name not in existing_columns:
+            cursor.execute(f"ALTER TABLE refugees_full ADD COLUMN {col_name} {col_type};")
+
+    # 3. حفظ وإغلاق الاتصال
+    conn.commit()
+    conn.close()
+
+# 4. استدعاء الدالة عند بداية التشغيل (في أول السطر تماماً بدون مسافات)
+init_db()
+
 
 
 

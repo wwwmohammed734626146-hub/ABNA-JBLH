@@ -227,7 +227,17 @@ with st.sidebar:
       and st.session_state["role"] == "مشرف النظام"
   )
 
-  options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
+  # قائمة خيارات كاملة تحتوي كافة الأيقونات والأقسام
+  options = [
+      "📊 لوحة التحكم الإحصائية",
+      "📝 تعبئة استمارة جديدة",
+      "📦 إدارة السلال الغذائية",
+      "🤝 إدارة الكفالات والرعايات",
+      "💰 الصندوق والحسابات",
+      "👥 القوى البشرية واللجان",
+      "📁 الأرشيف والمستندات",
+  ]
+
   if st.session_state["logged_in"]:
     options.append("🔑 تغيير كلمة المرور")
 
@@ -247,7 +257,7 @@ with st.sidebar:
 if menu_option == "📊 لوحة التحكم الإحصائية":
   st.title("📊 لوحة التحكم الموحدة للملتقى")
   conn = get_connection()
-  c1, c2, c3 = st.columns(3)
+  c1, c2, c3, c4 = st.columns(4)
   c1.metric(
       "عدد النازحين المسجلين",
       conn.execute("SELECT COUNT(*) FROM displaced_persons").fetchone()[0],
@@ -259,6 +269,10 @@ if menu_option == "📊 لوحة التحكم الإحصائية":
   c3.metric(
       "إجمالي الكفالات النشطة",
       conn.execute("SELECT COUNT(*) FROM sponsorships").fetchone()[0],
+  )
+  c4.metric(
+      "عدد أعضاء اللجان",
+      conn.execute("SELECT COUNT(*) FROM hr_members").fetchone()[0],
   )
   conn.close()
 
@@ -483,7 +497,6 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
           conn = get_connection()
           c = conn.cursor()
 
-          # 1️⃣ حفظ البيانات في جدول الاستمارة التفصيلية
           c.execute(
               """INSERT INTO full_refugee_forms (
                     doc_number, doc_date, doc_hijri, attachments, head_name, phone, edu_level, dob,
@@ -540,98 +553,4 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
                   int(f_18_59),
                   int(f_60_plus),
                   int(total_family),
-                  int(disabled_count),
-                  int(sponsored_count),
-                  house_num,
-                  house_type,
-                  house_ownership,
-                  landlord_name,
-                  house_gov,
-                  landlord_phone,
-                  "نعم" if need_shelter else "لا",
-                  "نعم" if need_supplies else "لا",
-                  "نعم" if need_water else "لا",
-                  "نعم" if need_food else "لا",
-                  "نعم" if need_medical else "لا",
-                  "نعم" if need_school else "لا",
-                  "نعم" if need_bathrooms else "لا",
-                  registered_wfp,
-                  current_org,
-                  other_needs,
-                  delegate_name,
-                  delegate_sub,
-              ),
-          )
-
-          # 2️⃣ حفظ البيانات في جدول النازحين العام
-          c.execute(
-              """INSERT INTO displaced_persons (
-                    doc_number, doc_date, doc_hijri, head_name, phone, id_number,
-                    orig_gov, orig_dir, current_location, family_members, status, notes
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-              (
-                  doc_number,
-                  doc_date,
-                  doc_hijri,
-                  head_name,
-                  phone,
-                  id_number,
-                  orig_gov,
-                  orig_dir,
-                  house_gov,
-                  int(total_family),
-                  "نازح",
-                  other_needs,
-              ),
-          )
-
-          # تأكيد وتطبيق الحفظ بصفة دائمة
-          conn.commit()
-          conn.close()
-
-          st.success(
-              f"تم حفظ استمارة الأخ ({head_name}) في قاعدة البيانات بنجاح وبشكل"
-              " دائم! ✅"
-          )
-        except Exception as e:
-          st.error(f"حدث خطأ أثناء الحفظ في قاعدة البيانات: {e}")
-      else:
-        st.error("يرجى إدخال اسم رب الأسرة على الأقل ⚠️")
-
-# --- 🔍 عرض استمارات النازحين ---
-elif menu_option == "🔍 عرض استمارات النازحين":
-  st.title("🔍 عرض استمارات النازحين المسجلة")
-  conn = get_connection()
-  df_forms = pd.read_sql_query("SELECT * FROM full_refugee_forms", conn)
-  conn.close()
-  render_export_and_print_tools(df_forms, "كشف_استمارات_النازحين_الشامل")
-
-# --- 📥 تصدير التقارير (Excel) ---
-elif menu_option == "📥 تصدير التقارير (Excel)":
-  st.title("📥 تصدير التقارير واستعراض الجداول")
-  conn = get_connection()
-  df_displaced = pd.read_sql_query("SELECT * FROM displaced_persons", conn)
-  conn.close()
-  render_export_and_print_tools(df_displaced, "كشف_النازحين_الموجز")
-
-# --- 🔑 تغيير كلمة المرور ---
-elif menu_option == "🔑 تغيير كلمة المرور":
-  st.title("🔑 تغيير كلمة المرور")
-  with st.form("change_pass_form"):
-    new_pass = st.text_input("كلمة المرور الجديدة:", type="password")
-    confirm_pass = st.text_input("تأكيد كلمة المرور:", type="password")
-    btn_change = st.form_submit_button("تحديث كلمة المرور")
-
-    if btn_change:
-      if new_pass and new_pass == confirm_pass:
-        conn = get_connection()
-        c = conn.cursor()
-        c.execute(
-            "UPDATE users SET password = ? WHERE username = ?",
-            (new_pass, st.session_state["username"]),
-        )
-        conn.commit()
-        conn.close()
-        st.success("تم تحديث كلمة المرور بنجاح! ✅")
-      else:
-        st.error("كلمتا المرور غير متطابقتين ❌")
+     

@@ -23,7 +23,7 @@ st.markdown(
     div.stButton > button:first-child { background-color: #075E54; color: white; width: 100%; font-size: 16px; font-weight: bold; border-radius: 6px; }
     h1, h2, h3, h4, p, label { text-align: right !important; direction: RTL !important; }
     .stTextInput, .stSelectbox, .stNumberInput, .stTextArea, .stDateInput { text-align: right !important; direction: RTL !important; }
-    .committee-card { background-color: #f8f9fa; border-right: 5px solid #075E54; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+    .committee-box { background-color: #f0f7f4; border: 1px solid #075E54; border-radius: 10px; padding: 18px; text-align: center; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
     </style>
     """,
     unsafe_allow_html=True,
@@ -44,15 +44,7 @@ def init_db():
   conn = get_connection()
   c = conn.cursor()
 
-  # 1. جدول النازحين المختصر
-  c.execute("""CREATE TABLE IF NOT EXISTS displaced_persons (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        doc_number TEXT, doc_date TEXT, doc_hijri TEXT, head_name TEXT, phone TEXT,
-        id_number TEXT, orig_gov TEXT, orig_dir TEXT, current_location TEXT,
-        family_members INTEGER, status TEXT, notes TEXT
-    )""")
-
-  # 2. جدول استمارة النزوح الكاملة
+  # 1. جدول استمارة النزوح الشاملة
   c.execute("""CREATE TABLE IF NOT EXISTS full_refugee_forms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
@@ -73,6 +65,14 @@ def init_db():
         need_medical TEXT, need_school TEXT, need_bathrooms TEXT,
         registered_wfp TEXT, current_org TEXT, other_needs TEXT,
         delegate_name TEXT, delegate_sub TEXT
+    )""")
+
+  # 2. جدول النازحين السريع
+  c.execute("""CREATE TABLE IF NOT EXISTS displaced_persons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doc_number TEXT, doc_date TEXT, head_name TEXT, phone TEXT,
+        id_number TEXT, orig_gov TEXT, current_location TEXT,
+        family_members INTEGER, status TEXT, notes TEXT
     )""")
 
   # 3. جدول السلال الغذائية
@@ -126,7 +126,7 @@ def init_db():
         full_name TEXT
     )""")
 
-  # إضافة المستخدم المشرف الافتراضي في حال عدم وجوده
+  # أدمن افتراضي
   c.execute(
       "INSERT OR IGNORE INTO users (id, username, password, role, full_name)"
       " VALUES (1, 'admin', 'admin123', 'مشرف النظام', 'المدير العام')"
@@ -941,6 +941,200 @@ elif menu_option == "💰 اللجنة المالية":
       if st.button("❌ حذف الحركة نهائياً", type="primary", key="del_fin_btn_m"):
         conn = get_connection()
         conn.execute("DELETE FROM finance WHERE id=?", (sel_f_id,))
+        conn.commit()
+        conn.close()
+        st.success("🗑️ تم الحذف بنجاح!")
+        st.rerun()
+# --- 📢 اللجنة الإعلامية ---
+elif menu_option == "📢 اللجنة الإعلامية":
+  st.title("📢 إدارة أعمال اللجنة الإعلامية والأرشيف الصحفي")
+
+  tm1, tm2, tm3 = st.tabs(["➕ إضافة خبر/تغطية", "📋 الأرشيف الإعلامي والطباعة والتصدير", "✏️ تعديل وحذف"])
+
+  with tm1:
+    with st.form("add_media_m_form"):
+      m_title = st.text_input("عنوان الخبر / التغطية الإعلامية *:")
+      m_cat = st.selectbox("التصنيف:", ["تغطية إعلامية", "بيان صحفي", "حملة توعية", "نشرة إخبارية", "معرض صور/فيديو"])
+      m_date = st.text_input("التاريخ:", value=datetime.now().strftime("%Y-%m-%d"))
+      m_link = st.text_input("رابط النشر (إن وجد):")
+      m_details = st.text_area("تفاصيل التغطية الإعلامية:")
+
+      if st.form_submit_button("💾 حفظ الخبر الإعلامي") and m_title:
+        conn = get_connection()
+        conn.execute(
+            """INSERT INTO media_archive (title, category, event_date, link_url, details) VALUES (?, ?, ?, ?, ?)""",
+            (m_title, m_cat, m_date, m_link, m_details)
+        )
+        conn.commit()
+        conn.close()
+        st.success("✅ تم حفظ الخبر بنجاح!")
+        st.rerun()
+
+  with tm2:
+    conn = get_connection()
+    df_med = pd.read_sql_query(
+        """SELECT id AS 'م', title AS 'العنوان', category AS 'التصنيف', event_date AS 'تاريخ النشر', link_url AS 'الرابط', details AS 'التفاصيل' FROM media_archive""",
+        conn,    )
+    conn.close()
+    render_export_and_print_tools(df_med, "الأرشيف الإعلامي للملتقى", key_prefix="media_m_view")
+
+  with tm3:
+    conn = get_connection()
+    m_recs = conn.execute("SELECT id, title, category FROM media_archive").fetchall()
+    conn.close()
+    if m_recs:
+      m_opts = {f"{r[0]} - {r[1]} ({r[2]})": r[0] for r in m_recs}
+      sel_m_id = m_opts[st.selectbox("اختر الخبر للتعديل/الحذف:", list(m_opts.keys()))]
+
+      conn = get_connection()
+      m_row = conn.execute("SELECT * FROM media_archive WHERE id=?", (sel_m_id,)).fetchone()
+      conn.close()
+
+      with st.form("emed_form"):
+        em_title = st.text_input("العنوان:", value=m_row[1])
+        em_details = st.text_area("التفاصيل:", value=m_row[5] or "")
+
+        if st.form_submit_button("💾 حفظ التعديل"):
+          conn = get_connection()
+          conn.execute("UPDATE media_archive SET title=?, details=? WHERE id=?", (em_title, em_details, sel_m_id))
+          conn.commit()
+          conn.close()
+          st.success("✅ تم التعديل بنجاح!")
+          st.rerun()
+
+      if st.button("❌ حذف الخبر نهائياً", type="primary", key="del_med_btn_m"):
+        conn = get_connection()
+        conn.execute("DELETE FROM media_archive WHERE id=?", (sel_m_id,))
+        conn.commit()
+        conn.close()
+        st.success("🗑️ تم الحذف بنجاح!")
+        st.rerun()
+
+# --- 🛡️ اللجنة العسكرية ---
+elif menu_option == "🛡️ اللجنة العسكرية":
+  st.title("🛡️ سجلات وشؤون اللجنة العسكرية والميدانية")
+
+  tv1, tv2, tv3 = st.tabs(["➕ إضافة سجل عسكري", "📋 السجل العام والتصدير والطباعة", "✏️ تعديل وحذف"])
+
+  with tv1:
+    with st.form("add_mil_m_form"):
+      mil_name = st.text_input("الاسم الكامل *:")
+      mil_role = st.text_input("الصفة / المهمة الميدانية:")
+      mil_sector = st.text_input("الموقع / القطاع:")
+      mil_phone = st.text_input("رقم الهاتف:")
+      mil_status = st.selectbox("الحالة الميدانية:", ["على رأس العمل", "إجازة", "مهمة خاصة", "غير ذلك"])
+      mil_notes = st.text_area("ملاحظات إضافية:")
+
+      if st.form_submit_button("💾 حفظ السجل الميداني") and mil_name:
+        conn = get_connection()
+        conn.execute(
+            """INSERT INTO military_records (member_name, rank_role, sector_location, phone, status, notes) VALUES (?, ?, ?, ?, ?, ?)""",
+            (mil_name, mil_role, mil_sector, mil_phone, mil_status, mil_notes)
+        )
+        conn.commit()
+        conn.close()
+        st.success("✅ تم حفظ السجل بنجاح!")
+        st.rerun()
+
+  with tv2:
+    conn = get_connection()
+    df_mil = pd.read_sql_query(
+        """SELECT id AS 'م', member_name AS 'الاسم', rank_role AS 'المهمة/الصفة', sector_location AS 'القطاع/الموقع', phone AS 'الهاتف', status AS 'الحالة', notes AS 'ملاحظات' FROM military_records""",
+        conn,    )
+    conn.close()
+    render_export_and_print_tools(df_mil, "السجل الميداني والعسكري", key_prefix="mil_m_view")
+
+  with tv3:
+    conn = get_connection()
+    mil_recs = conn.execute("SELECT id, member_name, rank_role FROM military_records").fetchall()
+    conn.close()
+    if mil_recs:
+      mil_opts = {f"{r[0]} - {r[1]} ({r[2]})": r[0] for r in mil_recs}
+      sel_mil_id = mil_opts[st.selectbox("اختر السجل للتعديل/الحذف:", list(mil_opts.keys()))]
+
+      conn = get_connection()
+      mil_row = conn.execute("SELECT * FROM military_records WHERE id=?", (sel_mil_id,)).fetchone()
+      conn.close()
+
+      with st.form("emil_form"):
+        emil_name = st.text_input("الاسم:", value=mil_row[1])
+        emil_notes = st.text_area("ملاحظات:", value=mil_row[6] or "")
+
+        if st.form_submit_button("💾 حفظ التعديل"):
+          conn = get_connection()
+          conn.execute("UPDATE military_records SET member_name=?, notes=? WHERE id=?", (emil_name, emil_notes, sel_mil_id))
+          conn.commit()
+          conn.close()
+          st.success("✅ تم التعديل بنجاح!")
+          st.rerun()
+
+      if st.button("❌ حذف السجل نهائياً", type="primary", key="del_mil_btn_m"):
+        conn = get_connection()
+        conn.execute("DELETE FROM military_records WHERE id=?", (sel_mil_id,))
+        conn.commit()
+        conn.close()
+        st.success("🗑️ تم الحذف بنجاح!")
+        st.rerun()
+
+# --- 📂 الأرشيف والمستندات ---
+elif menu_option == "📂 الأرشيف والمستندات":
+  st.title("📂 الأرشيف العام وتوثيق المعاملات والمستندات")
+
+  ta1, ta2, ta3 = st.tabs(["➕ أرشفة وثيقة جديدة", "📋 سجل الوثائق العام والطباعة والتصدير", "✏️ تعديل وحذف"])
+
+  with ta1:
+    with st.form("add_arch_m_form"):
+      doc_title = st.text_input("عنوان الوثيقة / المعاملة *:")
+      doc_type = st.selectbox("نوع الوثيقة:", ["رسالة رسمية", "محضر اجتماع", "عقد / اتفاقية", "قرار إداري", "أخرى"])
+      doc_date = st.text_input("تاريخ الوثيقة:", value=datetime.now().strftime("%Y-%m-%d"))
+      details = st.text_area("تفاصيل وفحوى الوثيقة:")
+
+      if st.form_submit_button("💾 حفظ الوثيقة بالأرشيف") and doc_title:
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO archive (doc_title, doc_type, doc_date, details) VALUES (?, ?, ?, ?)",
+            (doc_title, doc_type, doc_date, details)
+        )
+        conn.commit()
+        conn.close()
+        st.success("✅ تم حفظ الوثيقة بنجاح!")
+        st.rerun()
+
+  with ta2:
+    conn = get_connection()
+    df_arch = pd.read_sql_query(
+        """SELECT id AS 'م', doc_title AS 'عنوان الوثيقة', doc_type AS 'النوع', doc_date AS 'التاريخ', details AS 'التفاصيل' FROM archive""",
+        conn,    )
+    conn.close()
+    render_export_and_print_tools(df_arch, "سجل الأرشيف والمستندات العامة", key_prefix="arch_m_view")
+
+  with ta3:
+    conn = get_connection()
+    arch_recs = conn.execute("SELECT id, doc_title FROM archive").fetchall()
+    conn.close()
+    if arch_recs:
+      arch_opts = {f"{r[0]} - {r[1]}": r[0] for r in arch_recs}
+      sel_arch_id = arch_opts[st.selectbox("اختر الوثيقة للتعديل/الحذف:", list(arch_opts.keys()))]
+
+      conn = get_connection()
+      a_row = conn.execute("SELECT * FROM archive WHERE id=?", (sel_arch_id,)).fetchone()
+      conn.close()
+
+      with st.form("earch_form"):
+        ea_title = st.text_input("عنوان الوثيقة:", value=a_row[1])
+        ea_details = st.text_area("التفاصيل:", value=a_row[4] or "")
+
+        if st.form_submit_button("💾 حفظ التعديل"):
+          conn = get_connection()
+          conn.execute("UPDATE archive SET doc_title=?, details=? WHERE id=?", (ea_title, ea_details, sel_arch_id))
+          conn.commit()
+          conn.close()
+          st.success("✅ تم التعديل بنجاح!")
+          st.rerun()
+
+      if st.button("❌ حذف الوثيقة نهائياً", type="primary", key="del_arch_btn_m"):
+        conn = get_connection()
+        conn.execute("DELETE FROM archive WHERE id=?", (sel_arch_id,))
         conn.commit()
         conn.close()
         st.success("🗑️ تم الحذف بنجاح!")

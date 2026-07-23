@@ -430,7 +430,7 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
     with h_col4:
       landlord_name = st.text_input("اسم صاحب البيت المؤجر:")
     with h_col5:
-      house_gov = st.text_input("المافظة (السكن):")
+      house_gov = st.text_input("المحافظة (السكن):")
     with h_col6:
       landlord_phone = st.text_input("رقم الجوال (المؤجر):")
 
@@ -548,4 +548,4 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
                   landlord_name,
                   house_gov,
                   landlord_phone,
-                  "نعم" if need_s
+                  "نعم" if need_

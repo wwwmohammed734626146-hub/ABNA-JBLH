@@ -227,17 +227,7 @@ with st.sidebar:
       and st.session_state["role"] == "مشرف النظام"
   )
 
-  # قائمة خيارات كاملة تحتوي كافة الأيقونات والأقسام
-  options = [
-      "📊 لوحة التحكم الإحصائية",
-      "📝 تعبئة استمارة جديدة",
-      "📦 إدارة السلال الغذائية",
-      "🤝 إدارة الكفالات والرعايات",
-      "💰 الصندوق والحسابات",
-      "👥 القوى البشرية واللجان",
-      "📁 الأرشيف والمستندات",
-  ]
-
+  options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
   if st.session_state["logged_in"]:
     options.append("🔑 تغيير كلمة المرور")
 
@@ -257,7 +247,7 @@ with st.sidebar:
 if menu_option == "📊 لوحة التحكم الإحصائية":
   st.title("📊 لوحة التحكم الموحدة للملتقى")
   conn = get_connection()
-  c1, c2, c3, c4 = st.columns(4)
+  c1, c2, c3 = st.columns(3)
   c1.metric(
       "عدد النازحين المسجلين",
       conn.execute("SELECT COUNT(*) FROM displaced_persons").fetchone()[0],
@@ -269,10 +259,6 @@ if menu_option == "📊 لوحة التحكم الإحصائية":
   c3.metric(
       "إجمالي الكفالات النشطة",
       conn.execute("SELECT COUNT(*) FROM sponsorships").fetchone()[0],
-  )
-  c4.metric(
-      "عدد أعضاء اللجان",
-      conn.execute("SELECT COUNT(*) FROM hr_members").fetchone()[0],
   )
   conn.close()
 
@@ -444,7 +430,7 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
     with h_col4:
       landlord_name = st.text_input("اسم صاحب البيت المؤجر:")
     with h_col5:
-      house_gov = st.text_input("المحافظة (السكن):")
+      house_gov = st.text_input("المافظة (السكن):")
     with h_col6:
       landlord_phone = st.text_input("رقم الجوال (المؤجر):")
 
@@ -497,6 +483,7 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
           conn = get_connection()
           c = conn.cursor()
 
+          # 1️⃣ حفظ البيانات في جدول الاستمارة التفصيلية
           c.execute(
               """INSERT INTO full_refugee_forms (
                     doc_number, doc_date, doc_hijri, attachments, head_name, phone, edu_level, dob,
@@ -553,4 +540,12 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
                   int(f_18_59),
                   int(f_60_plus),
                   int(total_family),
-     
+                  int(disabled_count),
+                  int(sponsored_count),
+                  house_num,
+                  house_type,
+                  house_ownership,
+                  landlord_name,
+                  house_gov,
+                  landlord_phone,
+                  "نعم" if need_s

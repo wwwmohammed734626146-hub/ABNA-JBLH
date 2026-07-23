@@ -8,7 +8,6 @@ import streamlit as st
 # 1️⃣ المكتبات والتهيئة الأساسية
 # ==========================================
 
-# إعدادات الصفحة الرسمية للتطبيق
 st.set_page_config(
     page_title="نظام إدارة ملتقى أبناء مديرية جبلة الاجتماعي",
     page_icon="🏢",
@@ -52,7 +51,7 @@ def init_db():
         family_members INTEGER, status TEXT, notes TEXT
     )""")
 
-  # 1-ب. جدول استمارة النزوح الشاملة التفصيلية
+  # 2. جدول استمارة النزوح الشاملة التفصيلية
   c.execute("""CREATE TABLE IF NOT EXISTS full_refugee_forms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         doc_number TEXT, doc_date TEXT, doc_hijri TEXT, attachments TEXT,
@@ -75,32 +74,70 @@ def init_db():
         delegate_name TEXT, delegate_sub TEXT
     )""")
 
-  # 2. جدول السلال الغذائية
-  c.execute("""CREATE TABLE IF NOT EXISTS food_baskets 
-                (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, phone TEXT, date TEXT, basket_type TEXT)""")
-
-  # 3. جدول الكفالات والرعايات
-  c.execute("""CREATE TABLE IF NOT EXISTS sponsorships 
-                (id INTEGER PRIMARY KEY AUTOINCREMENT, orphan_name TEXT, sponsor_name TEXT, amount REAL, date TEXT)""")
-
-  # 4. جدول الصندوق والحسابات
-  c.execute("""CREATE TABLE IF NOT EXISTS finance 
-                (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, amount REAL, details TEXT, date TEXT)""")
-
-  # 5. جدول القوى البشرية
-  c.execute("""CREATE TABLE IF NOT EXISTS hr_members 
-                (id INTEGER PRIMARY KEY AUTOINCREMENT, member_name TEXT, role TEXT, phone TEXT)""")
-
-  # 6. جدول الأرشيف والمستندات
-  c.execute("""CREATE TABLE IF NOT EXISTS archive 
-                (id INTEGER PRIMARY KEY AUTOINCREMENT, doc_title TEXT, doc_type TEXT, doc_date TEXT, details TEXT)""")
-
-  # 7. جدول المستخدمين
-  c.execute("""CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT UNIQUE, password TEXT, role TEXT, full_name TEXT
+  # 3. جدول حركة السلال الغذائية (وارد ومنصرف)
+  c.execute("""CREATE TABLE IF NOT EXISTS food_baskets (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT, -- 'وارد' أو 'منصرف'
+        item_name TEXT,
+        quantity INTEGER,
+        party_name TEXT, -- الجهة الموردة أو المستفيد
+        phone TEXT,
+        date TEXT,
+        notes TEXT
     )""")
 
-  # 8. جدول اللجان التابعة للملتقى (جديد)
+  # 4. جدول الكفالات المطور (أيتام وأسر مكفولة وغير مكفولة)
+  c.execute("""CREATE TABLE IF NOT EXISTS sponsorships (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        category TEXT, -- 'يتيم مكفول', 'أسرة مكفولة', 'يتيم غير مكفول', 'أسرة غير مكفولة'
+        name TEXT,
+        sponsor_name TEXT,
+        amount REAL,
+        phone TEXT,
+        date TEXT,
+        notes TEXT
+    )""")
+
+  # 5. جدول الحسابات والمالية (وارد ومنصرف ومتبقي)
+  c.execute("""CREATE TABLE IF NOT EXISTS finance (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT, -- 'إيراد (وارد)', 'مصروف (منصرف)'
+        amount REAL,
+        details TEXT,
+        date TEXT
+    )""")
+
+  # 6. جدول الأرشيف الإعلامي (اللجنة الإعلامية)
+  c.execute("""CREATE TABLE IF NOT EXISTS media_archive (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        title TEXT,
+        category TEXT, -- 'تغطية إعلامية', 'بيان صحفي', 'حملة توعية', 'نشرة إخبارية'
+        event_date TEXT,
+        link_url TEXT,
+        details TEXT
+    )""")
+
+  # 7. جدول السجلات العسكرية والميدانية (اللجنة العسكرية)
+  c.execute("""CREATE TABLE IF NOT EXISTS military_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        member_name TEXT,
+        rank_role TEXT,
+        sector_location TEXT,
+        phone TEXT,
+        status TEXT,
+        notes TEXT
+    )""")
+
+  # 8. جدول الأرشيف العام والوثائق
+  c.execute("""CREATE TABLE IF NOT EXISTS archive (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        doc_title TEXT,
+        doc_type TEXT,
+        doc_date TEXT,
+        details TEXT
+    )""")
+
+  # 9. جدول الأعضاء واللجان
   c.execute("""CREATE TABLE IF NOT EXISTS committee_members (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         committee_name TEXT,
@@ -108,6 +145,15 @@ def init_db():
         role TEXT,
         phone TEXT,
         notes TEXT
+    )""")
+
+  # 10. جدول المستخدمين
+  c.execute("""CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        role TEXT,
+        full_name TEXT
     )""")
 
   c.execute(
@@ -122,11 +168,11 @@ def init_db():
 init_db()
 
 # ==========================================
-# 3️⃣ دالة الطباعة والتصدير
+# 3️⃣ دالة الطباعة والتصدير الموحدة
 # ==========================================
 
 
-def render_export_and_print_tools(df, section_title):
+def render_export_and_print_tools(df, section_title, key_prefix="exp"):
   if df.empty:
     st.info("لا توجد بيانات مسجلة حالياً في هذا القسم.")
     return
@@ -144,14 +190,15 @@ def render_export_and_print_tools(df, section_title):
         file_name=f"{section_title}.xlsx",
         mime="application/vnd.ms-excel",
         use_container_width=True,
+        key=f"{key_prefix}_btn_excel",
     )
 
   with col2:
     html_table = df.to_html(classes="table", index=False)
     print_code = f"""
         <script>
-        function printData() {{
-            var divToPrint = document.getElementById("printTable");
+        function printData_{key_prefix}() {{
+            var divToPrint = document.getElementById("printTable_{key_prefix}");
             newWin = window.open("");
             newWin.document.write('<html><head><title>طباعة {section_title}</title>');
             newWin.document.write('<style>body{{font-family: Arial; direction: rtl; text-align: right;}} table{{width:100%; border-collapse: collapse;}} th, td{{border: 1px solid #ddd; padding: 8px; text-align: center;}} th{{background-color: #f2f2f2;}}</style>');
@@ -162,8 +209,8 @@ def render_export_and_print_tools(df, section_title):
             newWin.close();
         }}
         </script>
-        <div id="printTable" style="display:none;">{html_table}</div>
-        <button onclick="printData()" style="width: 100%; padding: 8px; background-color: #2e7d32; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
+        <div id="printTable_{key_prefix}" style="display:none;">{html_table}</div>
+        <button onclick="printData_{key_prefix}()" style="width: 100%; padding: 8px; background-color: #2e7d32; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;">
             🖨️ طباعة الكشف
         </button>
         """
@@ -191,7 +238,7 @@ with st.sidebar:
   st.markdown(
       """
         <style>
-        .login-footer-credits { margin-top: 10px; margin-bottom: 15px; padding: 8px; background-color: #fff5f5; border-right: 4px solid #d32f2f; border-radius: 6px; direction: rtl; text-align: right; }
+        .login-footer-credits { margin-top: 5px; margin-bottom: 10px; padding: 6px; background-color: #fff5f5; border-right: 4px solid #d32f2f; border-radius: 6px; direction: rtl; text-align: right; }
         .login-footer-credits, .login-footer-credits a { color: #d32f2f !important; font-weight: bold !important; }
         </style>
         <div class="login-footer-credits">
@@ -234,29 +281,23 @@ with st.sidebar:
 
   st.write("---")
 
-  is_admin = (
-      st.session_state["logged_in"]
-      and st.session_state["role"] == "مشرف النظام"
-  )
-
-  options = ["📊 لوحة التحكم الإحصائية", "📝 تعبئة استمارة جديدة"]
+  options = [
+      "📊 لوحة التحكم الإحصائية",
+      "🤝 اللجنة الاجتماعية",
+      "💰 اللجنة المالية",
+      "📢 اللجنة الإعلامية",
+      "🛡️ اللجنة العسكرية",
+      "📂 الأرشيف والمستندات",
+  ]
 
   if st.session_state["logged_in"]:
     options.append("🔑 تغيير كلمة المرور")
-
-  if is_admin:
-    options.extend([
-        "🏛️ إدارة اللجان التابعة للملتقى",  # القسم الجديد
-        "🔍 عرض استمارات النازحين",
-        "✏️ تعديل بيانات الاستمارات",
-        "📦 توزيع السلال الغذائية",
-        "🤝 إدارة الكفالات والرعايات",
-        "📂 الأرشيف والمستندات",
-        "💰 الصندوق والحسابات (الوارد والمنصرف)",
-        "👥 إدارة القوى البشرية والكادر",
-        "🔐 إدارة المستخدمين وكلمات المرور",
-        "📥 تصدير التقارير (Excel)",
-    ])
+    if st.session_state["role"] == "مشرف النظام":
+      options.extend([
+          "🏛️ إدارة أعضاء اللجان",
+          "🔐 إدارة المستخدمين والصلاحيات",
+          "📥 مركز تصدير التقارير (Excel)",
+      ])
 
   menu_option = st.radio("القائمة الرئيسية:", options)
 # ==========================================
@@ -265,463 +306,162 @@ with st.sidebar:
 
 # --- 📊 لوحة التحكم الإحصائية ---
 if menu_option == "📊 لوحة التحكم الإحصائية":
-  st.title("📊 لوحة التحكم الموحدة للملتقى")
+  st.title("📊 لوحة التحكم الإحصائية الموحدة")
   conn = get_connection()
   c1, c2, c3, c4 = st.columns(4)
   c1.metric(
-      "عدد النازحين المسجلين",
+      "إجمالي استمارات النازحين",
       conn.execute("SELECT COUNT(*) FROM displaced_persons").fetchone()[0],
   )
-  c2.metric(
-      "إجمالي السلال الموزعة",
-      conn.execute("SELECT COUNT(*) FROM food_baskets").fetchone()[0],
+
+  basket_in = (
+      conn.execute(
+          "SELECT SUM(quantity) FROM food_baskets WHERE type='وارد'"
+      ).fetchone()[0]
+      or 0
   )
-  c3.metric(
-      "إجمالي الكفالات النشطة",
-      conn.execute("SELECT COUNT(*) FROM sponsorships").fetchone()[0],
+  basket_out = (
+      conn.execute(
+          "SELECT SUM(quantity) FROM food_baskets WHERE type='منصرف'"
+      ).fetchone()[0]
+      or 0
   )
+  c2.metric("المتبقي من السلال الغذائية", f"{basket_in - basket_out} سلة")
+
+  fin_in = (
+      conn.execute(
+          "SELECT SUM(amount) FROM finance WHERE type='إيراد (وارد)'"
+      ).fetchone()[0]
+      or 0.0
+  )
+  fin_out = (
+      conn.execute(
+          "SELECT SUM(amount) FROM finance WHERE type='مصروف (منصرف)'"
+      ).fetchone()[0]
+      or 0.0
+  )
+  c3.metric("الرصيد المالي المتبقي", f"{(fin_in - fin_out):,.2f} ريال")
+
   c4.metric(
-      "أعضاء اللجان",
-      conn.execute("SELECT COUNT(*) FROM committee_members").fetchone()[0],
+      "إجمالي الأيتام والأسر المكفولة",
+      conn.execute(
+          "SELECT COUNT(*) FROM sponsorships WHERE category LIKE '%مكفول%'"
+      ).fetchone()[0],
   )
   conn.close()
 
-# --- 🏛️ إدارة اللجان التابعة للملتقى (الجديد) ---
-elif menu_option == "🏛️ إدارة اللجان التابعة للملتقى":
-  st.header("🏛️ إدارة اللجان التابعة للملتقى")
+# --- 🤝 اللجنة الاجتماعية ---
+elif menu_option == "🤝 اللجنة الاجتماعية":
+  st.title("🤝 مهام وأقسام اللجنة الاجتماعية")
 
-  committees_list = [
-      "اللجنة الاجتماعية",
-      "اللجنة المالية",
-      "اللجنة الإعلامية",
-      "اللجنة العسكرية",
-  ]
-
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ إضافة عضو لجنة", "📋 كشوفات اللجان والطباعة", "✏️ تعديل وحذف"]
+  social_tab = st.selectbox(
+      "اختر القسم المطلوبة إدارة بياناته:",
+      [
+          "1️⃣ قسم تعبئة استمارة جديدة",
+          "2️⃣ قسم تعديل استمارة محفوظة",
+          "3️⃣ قسم كشوفات النازحين والاستمارات",
+          "4️⃣ قسم السلال الغذائية (الوارد والمنصرف والمتبقي)",
+          "5️⃣ قسم الكفالات والرعايات (أيتام وأسر)",
+      ],
   )
 
-  with tab1:
-    with st.form("add_committee_member_form"):
-      c_name = st.selectbox("اختر اللجنة:", committees_list)
-      m_name = st.text_input("اسم العضو كاملًا *:")
-      m_role = st.text_input(
-          "الصفة / المسمى التنظيمي (مثال: رئيس لجنة، عضو، مقرر):"
-      )
-      m_phone = st.text_input("رقم الهاتف / التواصل:")
-      m_notes = st.text_area("ملاحظات أخرى:")
-
-      if st.form_submit_button("💾 إضافة العضو للجنة"):
-        if m_name and m_name.strip() != "":
-          conn = get_connection()
-          conn.execute(
-              """INSERT INTO committee_members (committee_name, member_name, role, phone, notes)
-                             VALUES (?, ?, ?, ?, ?)""",
-              (c_name, m_name, m_role, m_phone, m_notes),
-          )
-          conn.commit()
-          conn.close()
-          st.success(f"✅ تم حفظ العضو بنجاح في ({c_name})!")
-        else:
-          st.warning("⚠️ يرجى إدخال اسم العضو.")
-
-  with tab2:
-    selected_filter = st.selectbox(
-        "تصفية حسب اللجنة:", ["الكل"] + committees_list
-    )
-    conn = get_connection()
-    if selected_filter == "الكل":
-      df = pd.read_sql_query(
-          """SELECT id AS 'م', committee_name AS 'اللجنة', member_name AS 'اسم العضو', 
-                                   role AS 'المسمى التنظيمي', phone AS 'الهاتف', notes AS 'ملاحظات' 
-                                   FROM committee_members""",
-          conn,
-      )
-    else:
-      df = pd.read_sql_query(
-          """SELECT id AS 'م', committee_name AS 'اللجنة', member_name AS 'اسم العضو', 
-                                   role AS 'المسمى التنظيمي', phone AS 'الهاتف', notes AS 'ملاحظات' 
-                                   FROM committee_members WHERE committee_name = ?""",
-          conn,
-          params=(selected_filter,),
-      )
-    conn.close()
-    render_export_and_print_tools(df, f"كشف اعضاء - {selected_filter}")
-
-  with tab3:
-    conn = get_connection()
-    records = conn.execute(
-        "SELECT id, member_name, committee_name FROM committee_members"
-    ).fetchall()
-    conn.close()
-
-    if records:
-      opts = {f"{r[0]} - {r[1]} ({r[2]})": r[0] for r in records}
-      sel = st.selectbox(
-          "اختر العضو للتعديل أو الحذف:", list(opts.keys()), key="sb_comm"
-      )
-      sel_id = opts[sel]
-
-      conn = get_connection()
-      cm_row = conn.execute(
-          "SELECT * FROM committee_members WHERE id=?", (sel_id,)
-      ).fetchone()
-      conn.close()
-
-      with st.form("edit_committee_form"):
-        ec_committee = st.selectbox(
-            "اللجنة:",
-            committees_list,
-            index=committees_list.index(cm_row[1])
-            if cm_row[1] in committees_list
-            else 0,
-        )
-        ec_name = st.text_input("اسم العضو:", value=cm_row[2])
-        ec_role = st.text_input("الصفة / المسمى:", value=cm_row[3])
-        ec_phone = st.text_input("الهاتف:", value=cm_row[4])
-        ec_notes = st.text_area("ملاحظات:", value=cm_row[5])
-
-        if st.form_submit_button("💾 حفظ التعديل"):
-          conn = get_connection()
-          conn.execute(
-              """UPDATE committee_members SET committee_name=?, member_name=?, role=?, phone=?, notes=? 
-                             WHERE id=?""",
-              (ec_committee, ec_name, ec_role, ec_phone, ec_notes, sel_id),
-          )
-          conn.commit()
-          conn.close()
-          st.success("✅ تم تحديث بيانات العضو بنجاح!")
-          st.rerun()
-
-      if st.button(
-          "❌ حذف العضو من اللجنة نهائياً", type="primary", key="del_comm"
-      ):
-        conn = get_connection()
-        conn.execute("DELETE FROM committee_members WHERE id=?", (sel_id,))
-        conn.commit()
-        conn.close()
-        st.success("🗑️ تم حذف العضو بنجاح!")
-        st.rerun()
-    else:
-      st.info("لا يوجد أعضاء مضافين في اللجان حالياً.")
-
-# --- 📝 تعبئة استمارة جديدة ---
-elif menu_option == "📝 تعبئة استمارة جديدة":
-  st.markdown(
-      "<h2 style='text-align: center;'>بسم الله الرحمن الرحيم</h2>",
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      "<h3 style='text-align: center;'>الجمهورية اليمنية<br>ملتقى أبناء"
-      " مديرية جبلة<br>اللجنة الاجتماعية</h3>",
-      unsafe_allow_html=True,
-  )
-  st.markdown(
-      "<h1 style='text-align: center; color: #075E54;'>استمارة نزوح</h1>",
-      unsafe_allow_html=True,
-  )
   st.write("---")
 
-  with st.form("full_refugee_form", clear_on_submit=False):
-    st.subheader("📌 بيانات الاستمارة والترقيم")
-    h1, h2, h3, h4 = st.columns(4)
-    with h1:
-      doc_number = st.text_input("الرقم:")
-    with h2:
-      doc_date = st.text_input(
-          "التاريخ:", value=datetime.now().strftime("%Y-%m-%d")
+  # 1- تعبئة استمارة جديدة
+  if social_tab == "1️⃣ قسم تعبئة استمارة جديدة":
+    st.header("📝 تعبئة استمارة نزوح جديدة")
+    with st.form("full_refugee_form", clear_on_submit=False):
+      st.subheader("📌 بيانات الاستمارة والترقيم")
+      h1, h2, h3, h4 = st.columns(4)
+      doc_number = h1.text_input("رقم الوثيقة / الاستمارة:")
+      doc_date = h2.text_input(
+          "تاريخ اليوم:", value=datetime.now().strftime("%Y-%m-%d")
       )
-    with h3:
-      doc_hijri = st.text_input("الموافق:")
-    with h4:
-      attachments = st.text_input("الملحقات:")
+      doc_hijri = h3.text_input("التاريخ الهجري:")
+      attachments = h4.text_input("الملحقات إن وجدت:")
 
-    st.subheader("👤 البيانات الشخصية لرب الأسرة")
-    c1, c2, c3, c4 = st.columns(4)
-    with c1:
-      head_name = st.text_input("اسم رب الأسرة رباعياً *:")
-    with c2:
-      phone = st.text_input("رقم التلفون:")
-    with c3:
-      edu_level = st.selectbox(
+      st.subheader("👤 البيانات الشخصية لرب الأسرة")
+      c1, c2, c3, c4 = st.columns(4)
+      head_name = c1.text_input("اسم رب الأسرة رباعياً *:")
+      phone = c2.text_input("رقم التلفون:")
+      edu_level = c3.selectbox(
           "المستوى التعليمي:",
           ["أمي", "يقرأ ويكتب", "أساسي", "ثانوي", "جامعي", "دراسات عليا"],
       )
-    with c4:
-      dob = st.text_input("تاريخ الميلاد:")
+      dob = c4.text_input("تاريخ الميلاد:")
 
-    c5, c6, c7, c8 = st.columns(4)
-    with c5:
-      id_number = st.text_input("رقم البطاقة الشخصية:")
-    with c6:
-      job_type = st.text_input("نوع العمل:")
-    with c7:
-      employer = st.text_input("جهة العمل:")
-    with c8:
-      qualification = st.text_input("المؤهل العلمي:")
+      c5, c6, c7, c8 = st.columns(4)
+      id_number = c5.text_input("رقم البطاقة الشخصية / الهوية:")
+      job_type = c6.text_input("نوع العمل / المهنة:")
+      employer = c7.text_input("جهة العمل:")
+      qualification = c8.text_input("المؤهل العلمي:")
 
-    c9, c10, c11, c12, c13 = st.columns(5)
-    with c9:
-      specialization = st.text_input("التخصص:")
-    with c10:
-      blood_type = st.text_input("فصيلة الدم:")
-    with c11:
-      health_status = st.text_input("الحالة الصحية:")
-    with c12:
-      disease_type = st.text_input("نوع المرض إن وجد:")
-    with c13:
-      id_issue_place = st.text_input("مكان الإصدار للبطاقة:")
+      st.subheader("📍 البيانات الجغرافية والسكن")
+      a1, a2, a3, a4 = st.columns(4)
+      orig_gov = a1.text_input("المحافظة الأصلية:")
+      orig_dir = a2.text_input("المديرية الأصلية:")
+      orig_sub = a3.text_input("العزلة الأصلية:")
+      orig_village = a4.text_input("القرية الأصلية:")
 
-    st.subheader("📍 بيانات المواقع الجغرافية")
-    st.markdown("**العنوان الأصلي:**")
-    a1, a2, a3, a4 = st.columns(4)
-    with a1:
-      orig_gov = st.text_input("المحافظة (الأصلية):")
-    with a2:
-      orig_dir = st.text_input("المديرية (الأصلية):")
-    with a3:
-      orig_sub = st.text_input("العزلة (الأصلية):")
-    with a4:
-      orig_village = st.text_input("القرية / الحارة (الأصلية):")
-
-    st.markdown("**مكان قبل النزوح:**")
-    b1, b2, b3, b4 = st.columns(4)
-    with b1:
-      prev_gov = st.text_input("المحافظة (قبل النزوح):")
-    with b2:
-      prev_dir = st.text_input("المديرية (قبل النزوح):")
-    with b3:
-      prev_sub = st.text_input("العزلة (قبل النزوح):")
-    with b4:
-      prev_village = st.text_input("القرية / الحارة (قبل النزوح):")
-
-    st.subheader("👥 أقرب صلة قرابة وحالة النزوح")
-    r1, r2, r3, r4, r5, r6 = st.columns(6)
-    with r1:
-      relative_name = st.text_input("اسم أقرب صلة قرابة:")
-    with r2:
-      relative_relation = st.text_input("صلة القرابة:")
-    with r3:
-      relative_phone = st.text_input("رقم الجوال (القرابة):")
-    with r4:
-      family_status = st.text_input("حالة الأسرة:")
-    with r5:
-      displacement_date = st.text_input("تاريخ النزوح للأسرة:")
-    with r6:
-      displacement_count = st.number_input(
-          "عدد مرات النزوح:", min_value=1, value=1, step=1
+      b1, b2, b3 = st.columns(3)
+      house_gov = b1.text_input("محافظة السكن الحالي:")
+      house_ownership = b2.selectbox(
+          "نوع ملكية السكن:", ["إيجار", "ملك", "مستضاف", "مأوى موقت"]
       )
+      landlord_name = b3.text_input("اسم المؤجر / المستضيف:")
 
-    st.subheader("👨👩👧👦 عدد أفراد الأسرة بالتفصيل")
-    spouse_name = st.text_input("اسم الزوج / الزوجة رباعياً:")
-    st.markdown("**توزيع الأفراد الذكور والإناث والاجماليات:**")
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
-    with m1:
-      m_under_1 = st.number_input(
-          "ذكور أقل من سنة:", min_value=0, value=0, step=1
+      st.subheader("👨👩👧👦 أفراد الأسرة والاحتياجات")
+      f1, f2, f3, f4 = st.columns(4)
+      total_family = f1.number_input(
+          "إجمالي أفراد الأسرة:", min_value=1, value=1
       )
-    with m2:
-      m_1_5 = st.number_input("ذكور 1-5 سنوات:", min_value=0, value=0, step=1)
-    with m3:
-      m_6_17 = st.number_input("ذكور 6-17 سنة:", min_value=0, value=0, step=1)
-    with m4:
-      m_18_59 = st.number_input("ذكور 18-59 سنة:", min_value=0, value=0, step=1)
-    with m5:
-      m_60_plus = st.number_input(
-          "ذكور 60+ سنة:", min_value=0, value=0, step=1
-      )
-    with m6:
-      f_under_1 = st.number_input(
-          "إناث أقل من سنة:", min_value=0, value=0, step=1
-      )
+      disabled_count = f2.number_input("عدد المعاقين:", min_value=0, value=0)
+      sponsored_count = f3.number_input("عدد المكفولين:", min_value=0, value=0)
+      family_status = f4.selectbox("حالة الأسرة:", ["نازح", "مقيم", "عائد"])
 
-    f1, f2, f3, f4, tot1, tot2, tot3 = st.columns(7)
-    with f1:
-      f_1_5 = st.number_input("إناث 1-5 سنوات:", min_value=0, value=0, step=1)
-    with f2:
-      f_6_17 = st.number_input("إناث 6-17 سنة:", min_value=0, value=0, step=1)
-    with f3:
-      f_18_59 = st.number_input("إناث 18-59 سنة:", min_value=0, value=0, step=1)
-    with f4:
-      f_60_plus = st.number_input(
-          "إناث 60+ سنة:", min_value=0, value=0, step=1
-      )
-    with tot1:
-      total_family = st.number_input(
-          "إجمالي أفراد الأسرة:", min_value=1, value=1, step=1
-      )
-    with tot2:
-      disabled_count = st.number_input(
-          "عدد المعاقين:", min_value=0, value=0, step=1
-      )
-    with tot3:
-      sponsored_count = st.number_input(
-          "عدد المكفولين:", min_value=0, value=0, step=1
-      )
+      other_needs = st.text_area("الاحتياجات الطارئة والتفاصيل الأخرى:")
 
-    st.subheader("🏠 بيانات السكن الحالي")
-    h_col1, h_col2, h_col3, h_col4, h_col5, h_col6 = st.columns(6)
-    with h_col1:
-      house_num = st.text_input("رقم البيت:")
-    with h_col2:
-      house_type = st.text_input("نوع البيت:")
-    with h_col3:
-      house_ownership = st.selectbox(
-          "ملك / إيجار:", ["إيجار", "ملك", "مستضاف", "آخر"]
-      )
-    with h_col4:
-      landlord_name = st.text_input("اسم صاحب البيت المؤجر:")
-    with h_col5:
-      house_gov = st.text_input("المحافظة (السكن):")
-    with h_col6:
-      landlord_phone = st.text_input("رقم الجوال (المؤجر):")
-
-    st.subheader("👨👩👧👦 بيانات أفراد الأسرة التفصيلية (جدول البيانات)")
-    st.caption("أدخل بيانات أفراد الأسرة إذا توفرت:")
-    members_data = []
-    for i in range(1, 6):
-      fm1, fm2, fm3, fm4 = st.columns([3, 2, 2, 2])
-      with fm1:
-        m_name = st.text_input(f"اسم الفرد ({i}):", key=f"mem_name_{i}")
-      with fm2:
-        m_dob = st.text_input(f"تاريخ الميلاد ({i}):", key=f"mem_dob_{i}")
-      with fm3:
-        m_rel = st.text_input(f"صلة القرابة ({i}):", key=f"mem_rel_{i}")
-      with fm4:
-        m_edu = st.text_input(f"المستوى التعليمي ({i}):", key=f"mem_edu_{i}")
-      if m_name:
-        members_data.append(f"{m_name} ({m_rel})")
-
-    st.subheader("📋 أهم الاحتياجات والمنظمات")
-    st.markdown("**أهم الاحتياجات:**")
-    nd1, nd2, nd3, nd4, nd5, nd6, nd7 = st.columns(7)
-    with nd1:
-      need_shelter = st.checkbox("مأوى")
-    with nd2:
-      need_supplies = st.checkbox("مواد إيواء")
-    with nd3:
-      need_water = st.checkbox("خزان مياه")
-    with nd4:
-      need_food = st.checkbox("غذاء")
-    with nd5:
-      need_medical = st.checkbox("طبي")
-    with nd6:
-      need_school = st.checkbox("حقيبة مدرسية")
-    with nd7:
-      need_bathrooms = st.checkbox("حمامات")
-
-    org1, org2, org3 = st.columns(3)
-    with org1:
-      registered_wfp = st.selectbox(
-          "هل مسجل في الغذاء العالمي؟", ["لا", "نعم"]
-      )
-    with org2:
-      current_org = st.text_input("ما هي المنظمة المقدمة حالياً:")
-    with org3:
-      other_needs = st.text_input("الاحتياجات الأخرى:")
-
-    st.subheader("📝 التوقيعات والاعتمادات")
-    sig1, sig2, sig3 = st.columns(3)
-    with sig1:
-      delegate_name = st.text_input("اسم مندوب العزلة:")
-    with sig2:
-      social_head = st.text_input(
-          "رئيس اللجنة الاجتماعية:", value="صلاح صادق عقلان"
-      )
-    with sig3:
-      delegate_sub = st.text_input(
-          "رئيس الملتقى:", value="إبراهيم محمد سعيد الشرعبي"
-      )
-
-    st.write("---")
-    submit_btn = st.form_submit_button("💾 حفظ الاستمارة كاملة")
-
-    if submit_btn:
-      if head_name and head_name.strip() != "":
-        try:
+      save_btn = st.form_submit_button("💾 حفظ الاستمارة كاملة")
+      if save_btn:
+        if head_name and head_name.strip() != "":
           conn = get_connection()
-          cursor = conn.cursor()
-
-          data_dict = {
-              "doc_number": doc_number,
-              "doc_date": doc_date,
-              "doc_hijri": doc_hijri,
-              "attachments": attachments,
-              "head_name": head_name,
-              "phone": phone,
-              "edu_level": edu_level,
-              "dob": dob,
-              "id_number": id_number,
-              "job_type": job_type,
-              "employer": employer,
-              "qualification": qualification,
-              "specialization": specialization,
-              "blood_type": blood_type,
-              "health_status": health_status,
-              "disease_type": disease_type,
-              "id_issue_place": id_issue_place,
-              "orig_gov": orig_gov,
-              "orig_dir": orig_dir,
-              "orig_sub": orig_sub,
-              "orig_village": orig_village,
-              "prev_gov": prev_gov,
-              "prev_dir": prev_dir,
-              "prev_sub": prev_sub,
-              "prev_village": prev_village,
-              "relative_name": relative_name,
-              "relative_relation": relative_relation,
-              "relative_phone": relative_phone,
-              "family_status": family_status,
-              "displacement_date": displacement_date,
-              "displacement_count": int(displacement_count),
-              "spouse_name": spouse_name,
-              "m_under_1": int(m_under_1),
-              "m_1_5": int(m_1_5),
-              "m_6_17": int(m_6_17),
-              "m_18_59": int(m_18_59),
-              "m_60_plus": int(m_60_plus),
-              "f_under_1": int(f_under_1),
-              "f_1_5": int(f_1_5),
-              "f_6_17": int(f_6_17),
-              "f_18_59": int(f_18_59),
-              "f_60_plus": int(f_60_plus),
-              "total_family": int(total_family),
-              "disabled_count": int(disabled_count),
-              "sponsored_count": int(sponsored_count),
-              "house_num": house_num,
-              "house_type": house_type,
-              "house_ownership": house_ownership,
-              "landlord_name": landlord_name,
-              "house_gov": house_gov,
-              "landlord_phone": landlord_phone,
-              "need_shelter": "نعم" if need_shelter else "لا",
-              "need_supplies": "نعم" if need_supplies else "لا",
-              "need_water": "نعم" if need_water else "لا",
-              "need_food": "نعم" if need_food else "لا",
-              "need_medical": "نعم" if need_medical else "لا",
-              "need_school": "نعم" if need_school else "لا",
-              "need_bathrooms": "نعم" if need_bathrooms else "لا",
-              "registered_wfp": registered_wfp,
-              "current_org": current_org,
-              "other_needs": (
-                  f"{other_needs} | الأفراد: {', '.join(members_data)}"
-                  if members_data
-                  else other_needs
+          c = conn.cursor()
+          c.execute(
+              """INSERT INTO full_refugee_forms 
+                    (doc_number, doc_date, doc_hijri, attachments, head_name, phone, edu_level, dob, id_number, job_type, employer, qualification, orig_gov, orig_dir, orig_sub, orig_village, total_family, disabled_count, sponsored_count, house_ownership, landlord_name, house_gov, family_status, other_needs)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              (
+                  doc_number,
+                  doc_date,
+                  doc_hijri,
+                  attachments,
+                  head_name,
+                  phone,
+                  edu_level,
+                  dob,
+                  id_number,
+                  job_type,
+                  employer,
+                  qualification,
+                  orig_gov,
+                  orig_dir,
+                  orig_sub,
+                  orig_village,
+                  total_family,
+                  disabled_count,
+                  sponsored_count,
+                  house_ownership,
+                  landlord_name,
+                  house_gov,
+                  family_status,
+                  other_needs,
               ),
-              "delegate_name": delegate_name,
-              "delegate_sub": delegate_sub,
-          }
+          )
 
-          cols = ", ".join(data_dict.keys())
-          placeholders = ", ".join(["?"] * len(data_dict))
-          query = f"INSERT INTO full_refugee_forms ({cols}) VALUES ({placeholders})"
-
-          cursor.execute(query, list(data_dict.values()))
-
-          cursor.execute(
+          c.execute(
               """INSERT INTO displaced_persons 
-                (doc_number, doc_date, head_name, phone, id_number, orig_gov, orig_dir, current_location, family_members, status, notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (doc_number, doc_date, head_name, phone, id_number, orig_gov, orig_dir, current_location, family_members, status, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
               (
                   doc_number,
                   doc_date,
@@ -736,381 +476,411 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
                   other_needs,
               ),
           )
-
           conn.commit()
           conn.close()
           st.success("✅ تم حفظ الاستمارة بنجاح في قاعدة البيانات!")
-        except Exception as e:
-          st.error(f"حدث خطأ أثناء حفظ الاستمارة: {e}")
-      else:
-        st.warning("⚠️ يرجى كتابة اسم رب الأسرة على الأقل لنتمكن من الحفظ.")
-# --- 🔍 عرض استمارات النازحين ---
-elif menu_option == "🔍 عرض استمارات النازحين":
-  st.header("🔍 عرض كشف استمارات النازحين والمستفيدين")
-  conn = get_connection()
-  df = pd.read_sql_query(
-      """SELECT id AS 'م', doc_number AS 'رقم الوثيقة', head_name AS 'اسم رب الأسرة', 
-                               phone AS 'الهاتف', id_number AS 'الهوية', current_location AS 'السكن الحالي', 
-                               family_members AS 'عدد الأفراد', status AS 'الحالة' FROM displaced_persons""",
-      conn,
-  )
-  conn.close()
-  render_export_and_print_tools(df, "كشف النازحين والمستفيدين")
+        else:
+          st.warning("⚠️ يرجى إدخال اسم رب الأسرة.")
 
-# --- ✏️ تعديل بيانات الاستمارات ---
-elif menu_option == "✏️ تعديل بيانات الاستمارات":
-  st.header("✏️ تعديل وتحديث بيانات الاستمارة بالكامل")
-  conn = get_connection()
-  records = conn.execute(
-      "SELECT id, head_name FROM displaced_persons"
-  ).fetchall()
-  conn.close()
-
-  if not records:
-    st.warning("لا توجد استمارات مسجلة حالياً للتعديل.")
-  else:
-    options_dict = {f"{r[0]} - {r[1]}": r[0] for r in records}
-    selected_option = st.selectbox(
-        "اختر الاستمارة لتعديلها أو حذفها:", list(options_dict.keys())
-    )
-    selected_id = options_dict[selected_option]
-
+  # 2- تعديل استمارة محفوظة
+  elif social_tab == "2️⃣ قسم تعديل استمارة محفوظة":
+    st.header("✏️ تعديل وتحديث أو حذف استمارة محفوظة")
     conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM displaced_persons WHERE id = ?", (selected_id,))
-    row = c.fetchone()
+    records = conn.execute(
+        "SELECT id, head_name, doc_number FROM displaced_persons"
+    ).fetchall()
     conn.close()
 
-    if row:
-      st.markdown("---")
-      with st.form("edit_full_form"):
-        st.subheader("📋 كافة بيانات الاستمارة المحددة:")
-        c1, c2 = st.columns(2)
-        with c1:
-          e_doc = st.text_input(
-              "رقم الوثيقة:", value=str(row[1]) if row[1] else ""
-          )
-          e_name = st.text_input(
-              "اسم رب الأسرة كاملاً:", value=str(row[4]) if row[4] else ""
-          )
-          e_phone = st.text_input(
-              "رقم الهاتف:", value=str(row[5]) if row[5] else ""
-          )
-          e_id_num = st.text_input(
-              "رقم الهوية:", value=str(row[6]) if row[6] else ""
-          )
-          e_orig_gov = st.text_input(
-              "المحافظة الأصلية:", value=str(row[7]) if row[7] else ""
-          )
-        with c2:
-          e_orig_dir = st.text_input(
-              "المديرية الأصلية:", value=str(row[8]) if row[8] else ""
-          )
-          e_location = st.text_input(
-              "مكان النزوح الحالي:", value=str(row[9]) if row[9] else ""
-          )
-          e_family = st.number_input(
-              "عدد أفراد الأسرة:",
-              min_value=1,
-              value=int(row[10]) if row[10] else 1,
-          )
-          st_list = ["نازح", "مقيم", "عائد"]
-          st_idx = st_list.index(row[11]) if row[11] in st_list else 0
-          e_status = st.selectbox("الحالة:", st_list, index=st_idx)
-          e_notes = st.text_area(
-              "ملاحظات:", value=str(row[12]) if row[12] else ""
-          )
+    if not records:
+      st.info("لا توجد استمارات مسجلة حالياً للتعديل.")
+    else:
+      opts = {f"{r[0]} - {r[1]} (وثيقة: {r[2]})": r[0] for r in records}
+      sel = st.selectbox("اختر الاستمارة المطلوب تعديلها أو حذفها:", list(opts.keys()))
+      sel_id = opts[sel]
 
-        save_btn = st.form_submit_button(
-            "💾 حفظ كافة التعديلات", use_container_width=True
-        )
+      conn = get_connection()
+      row = conn.execute(
+          "SELECT * FROM displaced_persons WHERE id=?", (sel_id,)
+      ).fetchone()
+      conn.close()
 
-        if save_btn:
+      if row:
+        with st.form("edit_disp_form"):
+          c1, c2 = st.columns(2)
+          e_doc = c1.text_input("رقم الوثيقة:", value=str(row[1] or ""))
+          e_name = c2.text_input("اسم رب الأسرة:", value=str(row[4] or ""))
+          e_phone = c1.text_input("الهاتف:", value=str(row[5] or ""))
+          e_id = c2.text_input("الهوية:", value=str(row[6] or ""))
+          e_gov = c1.text_input("المحافظة الأصلية:", value=str(row[7] or ""))
+          e_dir = c2.text_input("المديرية الأصلية:", value=str(row[8] or ""))
+          e_loc = c1.text_input("السكن الحالي:", value=str(row[9] or ""))
+          e_fam = c2.number_input(
+              "عدد الأفراد:", min_value=1, value=int(row[10] or 1)
+          )
+          e_status = c1.selectbox(
+              "الحالة:",
+              ["نازح", "مقيم", "عائد"],
+              index=["نازح", "مقيم", "عائد"].index(row[11])
+              if row[11] in ["نازح", "مقيم", "عائد"]
+              else 0,
+          )
+          e_notes = c2.text_area("ملاحظات:", value=str(row[12] or ""))
+
+          if st.form_submit_button("💾 حفظ التعديلات"):
+            conn = get_connection()
+            conn.execute(
+                """UPDATE displaced_persons SET doc_number=?, head_name=?, phone=?, id_number=?, orig_gov=?, orig_dir=?, current_location=?, family_members=?, status=?, notes=? WHERE id=?""",
+                (
+                    e_doc,
+                    e_name,
+                    e_phone,
+                    e_id,
+                    e_gov,
+                    e_dir,
+                    e_loc,
+                    e_fam,
+                    e_status,
+                    e_notes,
+                    sel_id,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            st.success("✅ تم تحديث بيانات الاستمارة بنجاح!")
+            st.rerun()
+
+        if st.button("❌ حذف هذه الاستمارة نهائياً", type="primary"):
           conn = get_connection()
-          conn.execute(
-              """UPDATE displaced_persons SET 
-                 doc_number=?, head_name=?, phone=?, id_number=?, orig_gov=?, orig_dir=?, current_location=?, family_members=?, status=?, notes=? 
-                 WHERE id=?""",
-              (
-                  e_doc,
-                  e_name,
-                  e_phone,
-                  e_id_num,
-                  e_orig_gov,
-                  e_orig_dir,
-                  e_location,
-                  e_family,
-                  e_status,
-                  e_notes,
-                  selected_id,
-              ),
-          )
-          conn.commit()
-          conn.close()
-          st.success("✅ تم تحديث بيانات الاستمارة بنجاح!")
-          st.rerun()
-
-      st.markdown("---")
-      with st.expander("🗑️ اضغط هنا لحذف هذه الاستمارة نهائياً"):
-        st.error(f"تنبيه: هل أنت تأكد من حذف استمارة ({row[4]})؟")
-        if st.button(
-            "❌ تأكيد حذف الاستمارة فوراً",
-            type="primary",
-            use_container_width=True,
-        ):
-          conn = get_connection()
-          conn.execute(
-              "DELETE FROM displaced_persons WHERE id = ?", (selected_id,)
-          )
+          conn.execute("DELETE FROM displaced_persons WHERE id=?", (sel_id,))
           conn.commit()
           conn.close()
           st.success("🗑️ تم حذف الاستمارة بنجاح!")
           st.rerun()
 
-# --- 📦 توزيع السلال الغذائية ---
-elif menu_option == "📦 توزيع السلال الغذائية":
-  st.header("📦 إدارة توزيع السلال الغذائية")
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ إضافة مستفيد", "📋 الكشوفات والطباعة", "✏️ تعديل وحذف"]
-  )
-
-  with tab1:
-    with st.form("add_basket_form"):
-      name = st.text_input("اسم المستفيد")
-      phone = st.text_input("رقم الهاتف")
-      b_type = st.selectbox(
-          "نوع السلة", ["سلة كاملة", "سلة مخفضة", "مساعدات عينية"]
-      )
-      if st.form_submit_button("حفظ البيانات") and name:
-        conn = get_connection()
-        conn.execute(
-            "INSERT INTO food_baskets (name, phone, date, basket_type) VALUES"
-            " (?, ?, DATE('now'), ?)",
-            (name, phone, b_type),
-        )
-        conn.commit()
-        conn.close()
-        st.success("تم حفظ البيانات بنجاح!")
-
-  with tab2:
+  # 3- كشوفات النازحين
+  elif social_tab == "3️⃣ قسم كشوفات النازحين والاستمارات":
+    st.header("📋 كشوفات النازحين حسب الاستمارات المعبأة")
     conn = get_connection()
     df = pd.read_sql_query(
-        "SELECT id AS 'م', name AS 'اسم المستفيد', phone AS 'الهاتف', date AS"
-        " 'التاريخ', basket_type AS 'نوع السلة' FROM food_baskets",
+        """SELECT id AS 'م', doc_number AS 'رقم الوثيقة', head_name AS 'اسم رب الأسرة', phone AS 'الهاتف', id_number AS 'الهوية', orig_gov AS 'المحافظة الأصلية', current_location AS 'السكن الحالي', family_members AS 'عدد الأفراد', status AS 'الحالة' FROM displaced_persons""",
         conn,    )
     conn.close()
-    render_export_and_print_tools(df, "توزيع السلال الغذائية")
+    render_export_and_print_tools(df, "كشف استمارات النازحين المعبأة", key_prefix="disp_list")
+  # 4- قسم السلال الغذائية (الوارد والمنصرف والمتبقي)
+  elif social_tab == "4️⃣ قسم السلال الغذائية (الوارد والمنصرف والمتبقي)":
+    st.header("📦 قسم السلال الغذائية (الوارد - المنصرف - المتبقي)")
 
-  with tab3:
     conn = get_connection()
-    records = conn.execute("SELECT id, name FROM food_baskets").fetchall()
+    total_in = (
+        conn.execute(
+            "SELECT SUM(quantity) FROM food_baskets WHERE type='وارد'"
+        ).fetchone()[0]
+        or 0
+    )
+    total_out = (
+        conn.execute(
+            "SELECT SUM(quantity) FROM food_baskets WHERE type='منصرف'"
+        ).fetchone()[0]
+        or 0
+    )
+    remaining = total_in - total_out
     conn.close()
-    if records:
-      opts = {f"{r[0]} - {r[1]}": r[0] for r in records}
-      sel = st.selectbox(
-          "اختر السجل للتعديل أو الحذف:", list(opts.keys()), key="sb_basket"
-      )
-      sel_id = opts[sel]
 
-      conn = get_connection()
-      b_row = conn.execute(
-          "SELECT * FROM food_baskets WHERE id=?", (sel_id,)
-      ).fetchone()
-      conn.close()
+    m1, m2, m3 = st.columns(3)
+    m1.metric("📥 إجمالي الوارد من السلال", f"{total_in} سلة")
+    m2.metric("📤 إجمالي المنصرف من السلال", f"{total_out} سلة")
+    m3.metric("📦 المتبقي بالمخزن", f"{remaining} سلة")
 
-      with st.form("edit_basket_form"):
-        eb_name = st.text_input("اسم المستفيد:", value=b_row[1])
-        eb_phone = st.text_input("رقم الهاتف:", value=b_row[2])
-        eb_type = st.selectbox(
-            "نوع السلة:",
-            ["سلة كاملة", "سلة مخفضة", "مساعدات عينية"],
-            index=(
-                ["سلة كاملة", "سلة مخفضة", "مساعدات عينية"].index(b_row[4])
-                if b_row[4] in ["سلة كاملة", "سلة مخفضة", "مساعدات عينية"]
-                else 0
-            ),
+    st.write("---")
+
+    tab_add, tab_view, tab_edit = st.tabs(
+        ["➕ إضافة حركة (وارد / منصرف)", "📋 كشف السلال والطباعة والتصدير", "✏️ تعديل وحذف"]
+    )
+
+    with tab_add:
+      with st.form("add_basket_mov"):
+        b_type = st.selectbox("نوع الحركة:", ["وارد", "منصرف"])
+        b_item = st.text_input(
+            "نوع / اسم السلة أو المساعدة:", value="سلة غذائية مكتملة"
         )
+        b_qty = st.number_input("الكمية (عدد السلال):", min_value=1, value=1)
+        b_party = st.text_input(
+            "الجهة الموردة (في الوارد) / اسم المستفيد (في المنصرف):"
+        )
+        b_phone = st.text_input("رقم الهاتف للتواصل:")
+        b_date = st.text_input(
+            "التاريخ:", value=datetime.now().strftime("%Y-%m-%d")
+        )
+        b_notes = st.text_area("ملاحظات إضافية:")
 
-        if st.form_submit_button("💾 حفظ التعديل"):
+        if st.form_submit_button("💾 حفظ الحركة"):
           conn = get_connection()
           conn.execute(
-              "UPDATE food_baskets SET name=?, phone=?, basket_type=? WHERE"
-              " id=?",
-              (eb_name, eb_phone, eb_type, sel_id),
+              """INSERT INTO food_baskets (type, item_name, quantity, party_name, phone, date, notes)
+                         VALUES (?, ?, ?, ?, ?, ?, ?)""",
+              (b_type, b_item, b_qty, b_party, b_phone, b_date, b_notes),
           )
           conn.commit()
           conn.close()
-          st.success("تم التعديل بنجاح!")
+          st.success("✅ تم حفظ حركة السلال الغذائية بنجاح!")
           st.rerun()
 
-      if st.button("❌ حذف السجل نهائياً", type="primary", key="del_basket"):
-        conn = get_connection()
-        conn.execute("DELETE FROM food_baskets WHERE id=?", (sel_id,))
-        conn.commit()
-        conn.close()
-        st.success("تم الحذف بنجاح!")
-        st.rerun()
-
-# --- 🤝 إدارة الكفالات والرعايات ---
-elif menu_option == "🤝 إدارة الكفالات والرعايات":
-  st.header("🤝 إدارة الكفالات والرعايات")
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ إضافة كفالة", "📋 الكشوفات والطباعة", "✏️ تعديل وحذف"]
-  )
-
-  with tab1:
-    with st.form("add_sp_form"):
-      o_name = st.text_input("اسم اليتيم / المكفول")
-      sp_name = st.text_input("اسم الكافل")
-      amount = st.number_input("المبلغ الشهري", min_value=0.0)
-      if st.form_submit_button("حفظ الكفالة") and o_name:
-        conn = get_connection()
-        conn.execute(
-            "INSERT INTO sponsorships (orphan_name, sponsor_name, amount,"
-            " date) VALUES (?, ?, ?, DATE('now'))",
-            (o_name, sp_name, amount),
-        )
-        conn.commit()
-        conn.close()
-        st.success("تمت إضافة الكفالة بنجاح!")
-
-  with tab2:
-    conn = get_connection()
-    df = pd.read_sql_query(
-        "SELECT id AS 'م', orphan_name AS 'المكفول', sponsor_name AS 'الكافل',"
-        " amount AS 'المبلغ', date AS 'التاريخ' FROM sponsorships",
-        conn,    )
-    conn.close()
-    render_export_and_print_tools(df, "إدارة الكفالات والرعايات")
-
-  with tab3:
-    conn = get_connection()
-    records = conn.execute("SELECT id, orphan_name FROM sponsorships").fetchall()
-    conn.close()
-    if records:
-      opts = {f"{r[0]} - {r[1]}": r[0] for r in records}
-      sel = st.selectbox(
-          "اختر الكفالة للتعديل/الحذف:", list(opts.keys()), key="sb_sp"
-      )
-      sel_id = opts[sel]
-
+    with tab_view:
       conn = get_connection()
-      sp_row = conn.execute(
-          "SELECT * FROM sponsorships WHERE id=?", (sel_id,)
-      ).fetchone()
+      df_baskets = pd.read_sql_query(
+          """SELECT id AS 'م', type AS 'نوع الحركة', item_name AS 'الصنف', quantity AS 'الكمية', party_name AS 'الجهة/المستفيد', phone AS 'الهاتف', date AS 'التاريخ', notes AS 'ملاحظات' FROM food_baskets""",
+          conn,      )
+      conn.close()
+      render_export_and_print_tools(df_baskets, "سجل حركة السلال الغذائية", key_prefix="baskets")
+
+    with tab_edit:
+      conn = get_connection()
+      b_records = conn.execute(
+          "SELECT id, type, party_name, quantity FROM food_baskets"
+      ).fetchall()
       conn.close()
 
-      with st.form("edit_sp_form"):
-        e_o_name = st.text_input("اسم المكفول:", value=sp_row[1])
-        e_sp_name = st.text_input("اسم الكافل:", value=sp_row[2])
-        e_amount = st.number_input(
-            "المبلغ:", value=float(sp_row[3]) if sp_row[3] else 0.0
-        )
+      if b_records:
+        b_opts = {
+            f"{r[0]} - [{r[1]}] {r[2]} ({r[3]} سلة)": r[0] for r in b_records
+        }
+        sel_b = st.selectbox("اختر السجل للتعديل أو الحذف:", list(b_opts.keys()))
+        sel_b_id = b_opts[sel_b]
 
-        if st.form_submit_button("💾 حفظ التعديل"):
-          conn = get_connection()
-          conn.execute(
-              "UPDATE sponsorships SET orphan_name=?, sponsor_name=?, amount=?"
-              " WHERE id=?",
-              (e_o_name, e_sp_name, e_amount, sel_id),
+        conn = get_connection()
+        b_row = conn.execute(
+            "SELECT * FROM food_baskets WHERE id=?", (sel_b_id,)
+        ).fetchone()
+        conn.close()
+
+        with st.form("edit_basket_form"):
+          eb_type = st.selectbox(
+              "النوع:",
+              ["وارد", "منصرف"],
+              index=0 if b_row[1] == "وارد" else 1,
           )
+          eb_item = st.text_input("الصنف:", value=b_row[2])
+          eb_qty = st.number_input("الكمية:", min_value=1, value=int(b_row[3]))
+          eb_party = st.text_input("الجهة / المستفيد:", value=b_row[4])
+          eb_phone = st.text_input("الهاتف:", value=b_row[5])
+          eb_date = st.text_input("التاريخ:", value=b_row[6])
+          eb_notes = st.text_area("ملاحظات:", value=b_row[7])
+
+          if st.form_submit_button("💾 حفظ التعديل"):
+            conn = get_connection()
+            conn.execute(
+                """UPDATE food_baskets SET type=?, item_name=?, quantity=?, party_name=?, phone=?, date=?, notes=? WHERE id=?""",
+                (
+                    eb_type,
+                    eb_item,
+                    eb_qty,
+                    eb_party,
+                    eb_phone,
+                    eb_date,
+                    eb_notes,
+                    sel_b_id,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            st.success("✅ تم تعديل سجل السلال بنجاح!")
+            st.rerun()
+
+        if st.button("❌ حذف هذا السجل نهائياً", type="primary", key="del_basket_btn"):
+          conn = get_connection()
+          conn.execute("DELETE FROM food_baskets WHERE id=?", (sel_b_id,))
           conn.commit()
           conn.close()
-          st.success("تم التعديل بنجاح!")
+          st.success("🗑️ تم حذف السجل بنجاح!")
           st.rerun()
 
-      if st.button("❌ حذف الكفالة نهائياً", type="primary", key="del_sp"):
-        conn = get_connection()
-        conn.execute("DELETE FROM sponsorships WHERE id=?", (sel_id,))
-        conn.commit()
-        conn.close()
-        st.success("تم الحذف بنجاح!")
-        st.rerun()
-# --- 📂 الأرشيف والمستندات ---
-elif menu_option == "📂 الأرشيف والمستندات":
-  st.header("📂 الأرشيف وتوثيق المستندات")
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ إضافة وثيقة", "📋 الأرشيف والطباعة", "✏️ تعديل وحذف"]
-  )
+  # 5- قسم الكفالات
+  elif social_tab == "5️⃣ قسم الكفالات والرعايات (أيتام وأسر)":
+    st.header("🤝 قسم الكفالات والرعايات (الأيتام والأسر)")
 
-  with tab1:
-    with st.form("add_archive_form"):
-      doc_title = st.text_input("عنوان المستند / المعاملة:")
-      doc_type = st.selectbox(
-          "نوع المستند:",
-          ["رسالة رسمية", "تقرير دوري", "محضر اجتماع", "عقد / اتفاقية", "أخرى"],
-      )
-      doc_date = st.text_input(
-          "تاريخ الوثيقة:", value=datetime.now().strftime("%Y-%m-%d")
-      )
-      details = st.text_area("تفاصيل / فحوى الوثيقة:")
-
-      if st.form_submit_button("💾 أرشفة المستند") and doc_title:
-        conn = get_connection()
+    conn = get_connection()
+    c_orphans_sp = (
         conn.execute(
-            "INSERT INTO archive (doc_title, doc_type, doc_date, details)"
-            " VALUES (?, ?, ?, ?)",
-            (doc_title, doc_type, doc_date, details),
+            "SELECT COUNT(*) FROM sponsorships WHERE category='يتيم مكفول'"
+        ).fetchone()[0]
+        or 0
+    )
+    c_families_sp = (
+        conn.execute(
+            "SELECT COUNT(*) FROM sponsorships WHERE category='أسرة مكفولة'"
+        ).fetchone()[0]
+        or 0
+    )
+    c_orphans_unsp = (
+        conn.execute(
+            "SELECT COUNT(*) FROM sponsorships WHERE category='يتيم غير"
+            " مكفول'"
+        ).fetchone()[0]
+        or 0
+    )
+    c_families_unsp = (
+        conn.execute(
+            "SELECT COUNT(*) FROM sponsorships WHERE category='أسرة غير"
+            " مكفولة'"
+        ).fetchone()[0]
+        or 0
+    )
+    conn.close()
+
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("👶 عدد الأيتام المكفولين", f"{c_orphans_sp}")
+    k2.metric("🏠 عدد الأسر المكفولة", f"{c_families_sp}")
+    k3.metric("⏳ أيتام غير مكفولين", f"{c_orphans_unsp}")
+    k4.metric("⏳ أسر غير مكفولة", f"{c_families_unsp}")
+
+    st.write("---")
+
+    tab_sp_add, tab_sp_view, tab_sp_edit = st.tabs(
+        ["➕ تسجيل حالة كفالة", "📋 كشوفات وتقارير الكفالات والتصدير", "✏️ تعديل وحذف"]
+    )
+
+    with tab_sp_add:
+      with st.form("add_sponsorship_form"):
+        s_cat = st.selectbox(
+            "تصنيف الحالة *:",
+            [
+                "يتيم مكفول",
+                "أسرة مكفولة",
+                "يتيم غير مكفول",
+                "أسرة غير مكفولة",
+            ],
         )
-        conn.commit()
-        conn.close()
-        st.success("تم أرشفة الوثيقة بنجاح!")
+        s_name = st.text_input("اسم اليتيم / رب الأسرة رباعياً *:")
+        s_sponsor = st.text_input("اسم الكافل (إن وجد):")
+        s_amount = st.number_input(
+            "مبلغ الكفالة الشهري (إن وجد):", min_value=0.0, step=1000.0
+        )
+        s_phone = st.text_input("رقم هاتف للتواصل:")
+        s_date = st.text_input(
+            "تاريخ التسجيل:", value=datetime.now().strftime("%Y-%m-%d")
+        )
+        s_notes = st.text_area("تفاصيل وملاحظات إضافية:")
 
-  with tab2:
-    conn = get_connection()
-    df = pd.read_sql_query(
-        "SELECT id AS 'م', doc_title AS 'عنوان الوثيقة', doc_type AS 'نوع"
-        " الوثيقة', doc_date AS 'التاريخ', details AS 'التفاصيل' FROM archive",
-        conn,    )
-    conn.close()
-    render_export_and_print_tools(df, "سجل الأرشيف والمستندات")
+        if st.form_submit_button("💾 حفظ الحالة"):
+          if s_name:
+            conn = get_connection()
+            conn.execute(
+                """INSERT INTO sponsorships (category, name, sponsor_name, amount, phone, date, notes)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (s_cat, s_name, s_sponsor, s_amount, s_phone, s_date, s_notes),
+            )
+            conn.commit()
+            conn.close()
+            st.success("✅ تم تسجل الحالة بنجاح!")
+            st.rerun()
 
-  with tab3:
-    conn = get_connection()
-    records = conn.execute("SELECT id, doc_title FROM archive").fetchall()
-    conn.close()
-    if records:
-      opts = {f"{r[0]} - {r[1]}": r[0] for r in records}
-      sel = st.selectbox(
-          "اختر الوثيقة للتعديل أو الحذف:", list(opts.keys()), key="sb_arch"
+    with tab_sp_view:
+      cat_filter = st.selectbox(
+          "تصفية الكشف حسب الفئة:",
+          [
+              "الكل",
+              "يتيم مكفول",
+              "أسرة مكفولة",
+              "يتيم غير مكفول",
+              "أسرة غير مكفولة",
+          ],
       )
-      sel_id = opts[sel]
-
       conn = get_connection()
-      a_row = conn.execute(
-          "SELECT * FROM archive WHERE id=?", (sel_id,)
-      ).fetchone()
+      if cat_filter == "الكل":
+        df_sp = pd.read_sql_query(
+            """SELECT id AS 'م', category AS 'التصنيف', name AS 'الاسم', sponsor_name AS 'الكافل', amount AS 'المبلغ', phone AS 'الهاتف', date AS 'التاريخ', notes AS 'ملاحظات' FROM sponsorships""",
+            conn,        )
+      else:
+        df_sp = pd.read_sql_query(
+            """SELECT id AS 'م', category AS 'التصنيف', name AS 'الاسم', sponsor_name AS 'الكافل', amount AS 'المبلغ', phone AS 'الهاتف', date AS 'التاريخ', notes AS 'ملاحظات' FROM sponsorships WHERE category=?""",
+            conn,
+            params=(cat_filter,),
+        )
+      conn.close()
+      render_export_and_print_tools(df_sp, f"كشف الكفالات - {cat_filter}", key_prefix="sp_list")
+
+    with tab_sp_edit:
+      conn = get_connection()
+      sp_recs = conn.execute(
+          "SELECT id, name, category FROM sponsorships"
+      ).fetchall()
       conn.close()
 
-      with st.form("edit_archive_form"):
-        ea_title = st.text_input("عنوان الوثيقة:", value=a_row[1])
-        ea_type = st.text_input("نوع الوثيقة:", value=a_row[2])
-        ea_date = st.text_input("التاريخ:", value=a_row[3])
-        ea_details = st.text_area("التفاصيل:", value=a_row[4])
+      if sp_recs:
+        sp_opts = {f"{r[0]} - {r[1]} ({r[2]})": r[0] for r in sp_recs}
+        sel_sp = st.selectbox("اختر السجل للتعديل أو الحذف:", list(sp_opts.keys()))
+        sel_sp_id = sp_opts[sel_sp]
 
-        if st.form_submit_button("💾 حفظ التعديل"):
-          conn = get_connection()
-          conn.execute(
-              "UPDATE archive SET doc_title=?, doc_type=?, doc_date=?,"
-              " details=? WHERE id=?",
-              (ea_title, ea_type, ea_date, ea_details, sel_id),
+        conn = get_connection()
+        sp_row = conn.execute(
+            "SELECT * FROM sponsorships WHERE id=?", (sel_sp_id,)
+        ).fetchone()
+        conn.close()
+
+        with st.form("edit_sp_form"):
+          es_cat = st.selectbox(
+              "التصنيف:",
+              [
+                  "يتيم مكفول",
+                  "أسرة مكفولة",
+                  "يتيم غير مكفول",
+                  "أسرة غير مكفولة",
+              ],
+              index=[
+                  "يتيم مكفول",
+                  "أسرة مكفولة",
+                  "يتيم غير مكفول",
+                  "أسرة غير مكفولة",
+              ].index(sp_row[1])
+              if sp_row[1]
+              in [
+                  "يتيم مكفول",
+                  "أسرة مكفولة",
+                  "يتيم غير مكفول",
+                  "أسرة غير مكفولة",
+              ]
+              else 0,
           )
+          es_name = st.text_input("الاسم:", value=sp_row[2])
+          es_sponsor = st.text_input("الكافل:", value=sp_row[3] or "")
+          es_amount = st.number_input(
+              "المبلغ:", value=float(sp_row[4] or 0.0)
+          )
+          es_phone = st.text_input("الهاتف:", value=sp_row[5] or "")
+          es_date = st.text_input("التاريخ:", value=sp_row[6] or "")
+          es_notes = st.text_area("ملاحظات:", value=sp_row[7] or "")
+
+          if st.form_submit_button("💾 حفظ التعديل"):
+            conn = get_connection()
+            conn.execute(
+                """UPDATE sponsorships SET category=?, name=?, sponsor_name=?, amount=?, phone=?, date=?, notes=? WHERE id=?""",
+                (
+                    es_cat,
+                    es_name,
+                    es_sponsor,
+                    es_amount,
+                    es_phone,
+                    es_date,
+                    es_notes,
+                    sel_sp_id,
+                ),
+            )
+            conn.commit()
+            conn.close()
+            st.success("✅ تم التعديل بنجاح!")
+            st.rerun()
+
+        if st.button("❌ حذف هذه الحالة نهائياً", type="primary", key="del_sp_btn"):
+          conn = get_connection()
+          conn.execute("DELETE FROM sponsorships WHERE id=?", (sel_sp_id,))
           conn.commit()
           conn.close()
-          st.success("تم تعديل البيانات بنجاح!")
+          st.success("🗑️ تم الحذف بنجاح!")
           st.rerun()
 
-      if st.button("❌ حذف الوثيقة نهائياً", type="primary", key="del_arch"):
-        conn = get_connection()
-        conn.execute("DELETE FROM archive WHERE id=?", (sel_id,))
-        conn.commit()
-        conn.close()
-        st.success("تم الحذف من الأرشيف!")
-        st.rerun()
-
-# --- 💰 الصندوق والحسابات (الوارد والمنصرف) ---
-elif menu_option == "💰 الصندوق والحسابات (الوارد والمنصرف)":
-  st.header("💰 إدارة الصندوق والحسابات المالية")
+# --- 💰 اللجنة المالية ---
+elif menu_option == "💰 اللجنة المالية":
+  st.title("💰 إدارة أعمال اللجنة المالية والصندوق")
 
   conn = get_connection()
   inflow = (
@@ -1128,179 +898,336 @@ elif menu_option == "💰 الصندوق والحسابات (الوارد وال
   conn.close()
 
   f1, f2, f3 = st.columns(3)
-  f1.metric("إجمالي الوارد (الإيرادات)", f"{inflow:,.2f} ريال")
-  f2.metric("إجمالي المنصرف (المصروفات)", f"{outflow:,.2f} ريال")
-  f3.metric("الرصيد المتبقي بالصندوق", f"{(inflow - outflow):,.2f} ريال")
+  f1.metric("💵 إجمالي الوارد (الإيرادات)", f"{inflow:,.2f} ريال")
+  f2.metric("💸 إجمالي المنصرف (المصروفات)", f"{outflow:,.2f} ريال")
+  f3.metric("🏛️ المتبقي الصافي بالصندوق", f"{(inflow - outflow):,.2f} ريال")
 
   st.write("---")
 
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ تسجيل حركة مالية", "📋 كشف الصندوق والطباعة", "✏️ تعديل وحذف"]
+  t_fin_add, t_fin_view, t_fin_edit = st.tabs(
+      ["1️⃣ إضافة حركة مالية (وارد / منصرف)", "2️⃣ كشف الحسابات والتصدير والطباعة", "3️⃣ تعديل وحذف حركة"]
   )
 
-  with tab1:
+  with t_fin_add:
     with st.form("add_finance_form"):
-      f_type = st.selectbox(
+      fin_type = st.selectbox(
           "نوع الحركة المالية:", ["إيراد (وارد)", "مصروف (منصرف)"]
       )
-      f_amount = st.number_input("المبلغ:", min_value=0.0, step=100.0)
-      f_details = st.text_area("تفاصيل / البيان:")
-      f_date = st.text_input(
-          "تاريخ الحركة:", value=datetime.now().strftime("%Y-%m-%d")
+      fin_amount = st.number_input("المبلغ:", min_value=0.0, step=1000.0)
+      fin_details = st.text_area("تفاصيل / البيان والجهة:")
+      fin_date = st.text_input(
+          "التاريخ:", value=datetime.now().strftime("%Y-%m-%d")
       )
 
-      if st.form_submit_button("💾 حفظ الحركة المالية") and f_amount > 0:
+      if st.form_submit_button("💾 حفظ الحركة المالية") and fin_amount > 0:
         conn = get_connection()
         conn.execute(
-            "INSERT INTO finance (type, amount, details, date) VALUES (?, ?,"
-            " ?, ?)",
-            (f_type, f_amount, f_details, f_date),
+            """INSERT INTO finance (type, amount, details, date) VALUES (?, ?, ?, ?)""",
+            (fin_type, fin_amount, fin_details, fin_date),
         )
         conn.commit()
         conn.close()
-        st.success("تم تسجيل الحركة المالية بنجاح!")
+        st.success("✅ تم تسجيل الحركة المالية بنجاح!")
         st.rerun()
 
-  with tab2:
+  with t_fin_view:
     conn = get_connection()
-    df = pd.read_sql_query(
-        "SELECT id AS 'م', type AS 'نوع الحركة', amount AS 'المبلغ', details"
-        " AS 'البيان والتفاصيل', date AS 'التاريخ' FROM finance",
+    df_fin = pd.read_sql_query(
+        """SELECT id AS 'م', type AS 'نوع الحركة', amount AS 'المبلغ', details AS 'البيان والتفاصيل', date AS 'التاريخ' FROM finance""",
         conn,    )
     conn.close()
-    render_export_and_print_tools(df, "دفتر الصندوق والحسابات المالية")
+    render_export_and_print_tools(df_fin, "دفتر الحسابات والصندوق المالي", key_prefix="fin_ledger")
 
-  with tab3:
+  with t_fin_edit:
     conn = get_connection()
-    records = conn.execute("SELECT id, type, amount, date FROM finance").fetchall()
-    conn.close()
-    if records:
-      opts = {
-          f"{r[0]} - {r[1]} - {r[2]} ريال ({r[3]})": r[0] for r in records
-      }
-      sel = st.selectbox(
-          "اختر الحركة المالية للتعديل/الحذف:",
-          list(opts.keys()),
-          key="sb_fin",
-      )
-      sel_id = opts[sel]
-
-      conn = get_connection()
-      fin_row = conn.execute(
-          "SELECT * FROM finance WHERE id=?", (sel_id,)
-      ).fetchone()
-      conn.close()
-
-      with st.form("edit_finance_form"):
-        ef_type = st.selectbox(
-            "نوع الحركة:",
-            ["إيراد (وارد)", "مصروف (منصرف)"],
-            index=0 if fin_row[1] == "إيراد (وارد)" else 1,
-        )
-        ef_amount = st.number_input("المبلغ:", value=float(fin_row[2]))
-        ef_details = st.text_area("التفاصيل:", value=fin_row[3])
-        ef_date = st.text_input("التاريخ:", value=fin_row[4])
-
-        if st.form_submit_button("💾 حفظ التعديل"):
-          conn = get_connection()
-          conn.execute(
-              "UPDATE finance SET type=?, amount=?, details=?, date=? WHERE"
-              " id=?",
-              (ef_type, ef_amount, ef_details, ef_date, sel_id),
-          )
-          conn.commit()
-          conn.close()
-          st.success("تم التعديل بنجاح!")
-          st.rerun()
-
-      if st.button("❌ حذف الحركة المالية نهائياً", type="primary", key="del_fin"):
-        conn = get_connection()
-        conn.execute("DELETE FROM finance WHERE id=?", (sel_id,))
-        conn.commit()
-        conn.close()
-        st.success("تم الحذف بنجاح!")
-        st.rerun()
-
-# --- 👥 إدارة القوى البشرية والكادر ---
-elif menu_option == "👥 إدارة القوى البشرية والكادر":
-  st.header("👥 إدارة القوى البشرية وكادر الملتقى")
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ إضافة عضو جديد", "📋 كشف الأعضاء والطباعة", "✏️ تعديل وحذف"]
-  )
-
-  with tab1:
-    with st.form("add_hr_form"):
-      m_name = st.text_input("اسم العضو / الموظف كاملًا:")
-      m_role = st.text_input("الصفة / المسمى التنظيمي:")
-      m_phone = st.text_input("رقم التواصل:")
-
-      if st.form_submit_button("💾 إضافة للكادر") and m_name:
-        conn = get_connection()
-        conn.execute(
-            "INSERT INTO hr_members (member_name, role, phone) VALUES (?, ?,"
-            " ?)",
-            (m_name, m_role, m_phone),
-        )
-        conn.commit()
-        conn.close()
-        st.success("تمت إضافة العضو للكادر الإداري بنجاح!")
-
-  with tab2:
-    conn = get_connection()
-    df = pd.read_sql_query(
-        "SELECT id AS 'م', member_name AS 'اسم العضو', role AS 'المسمى"
-        " التنظيمي', phone AS 'الهاتف' FROM hr_members",
-        conn,    )
-    conn.close()
-    render_export_and_print_tools(df, "كادر القوى البشرية واللجان")
-
-  with tab3:
-    conn = get_connection()
-    records = conn.execute(
-        "SELECT id, member_name FROM hr_members"
+    f_recs = conn.execute(
+        "SELECT id, type, amount, date FROM finance"
     ).fetchall()
     conn.close()
 
-    if records:
-      opts = {f"{r[0]} - {r[1]}": r[0] for r in records}
-      sel = st.selectbox(
-          "اختر العضو للتعديل/الحذف:", list(opts.keys()), key="sb_hr"
-      )
-      sel_id = opts[sel]
+    if f_recs:
+      f_opts = {f"{r[0]} - [{r[1]}] {r[2]} ريال ({r[3]})": r[0] for r in f_recs}
+      sel_f = st.selectbox("اختر الحركة للتعديل/الحذف:", list(f_opts.keys()))
+      sel_f_id = f_opts[sel_f]
 
       conn = get_connection()
-      hr_row = conn.execute(
-          "SELECT * FROM hr_members WHERE id=?", (sel_id,)
+      f_row = conn.execute(
+          "SELECT * FROM finance WHERE id=?", (sel_f_id,)
       ).fetchone()
       conn.close()
 
-      with st.form("edit_hr_form"):
-        em_name = st.text_input("الاسم:", value=hr_row[1])
-        em_role = st.text_input("المسمى التنظيمي:", value=hr_row[2])
-        em_phone = st.text_input("الهاتف:", value=hr_row[3])
+      with st.form("edit_fin_form"):
+        ef_type = st.selectbox(
+            "نوع الحركة:",
+            ["إيراد (وارد)", "مصروف (منصرف)"],
+            index=0 if f_row[1] == "إيراد (وارد)" else 1,
+        )
+        ef_amount = st.number_input(
+            "المبلغ:", value=float(f_row[2] or 0.0), step=1000.0
+        )
+        ef_details = st.text_area("البيان والتفاصيل:", value=f_row[3] or "")
+        ef_date = st.text_input("التاريخ:", value=f_row[4] or "")
 
         if st.form_submit_button("💾 حفظ التعديل"):
           conn = get_connection()
           conn.execute(
-              "UPDATE hr_members SET member_name=?, role=?, phone=? WHERE id=?",
-              (em_name, em_role, em_phone, sel_id),
+              """UPDATE finance SET type=?, amount=?, details=?, date=? WHERE id=?""",
+              (ef_type, ef_amount, ef_details, ef_date, sel_f_id),
           )
           conn.commit()
           conn.close()
-          st.success("تم التعديل بنجاح!")
+          st.success("✅ تم التعديل بنجاح!")
           st.rerun()
 
-      if st.button("❌ حذف العضو نهائياً", type="primary", key="del_hr"):
+      if st.button("❌ حذف هذه الحركة نهائياً", type="primary", key="del_fin_btn"):
         conn = get_connection()
-        conn.execute("DELETE FROM hr_members WHERE id=?", (sel_id,))
+        conn.execute("DELETE FROM finance WHERE id=?", (sel_f_id,))
         conn.commit()
         conn.close()
-        st.success("تم الحذف بنجاح!")
+        st.success("🗑️ تم الحذف بنجاح!")
+        st.rerun()
+# --- 📢 اللجنة الإعلامية ---
+elif menu_option == "📢 اللجنة الإعلامية":
+  st.title("📢 إدارة أعمال اللجنة الإعلامية والأرشيف الصحفي")
+
+  tab_med_add, tab_med_view, tab_med_edit = st.tabs(
+      ["➕ إضافة تغطية / خبر إعلامي", "📋 الأرشيف الإعلامي والطباعة والتصدير", "✏️ تعديل وحذف"]
+  )
+
+  with tab_med_add:
+    with st.form("add_media_form"):
+      m_title = st.text_input("عنوان الخبر / التغطية الإعلامية *:")
+      m_cat = st.selectbox(
+          "التصنيف:",
+          [
+              "تغطية إعلامية",
+              "بيان صحفي",
+              "حملة توعية",
+              "نشرة إخبارية",
+              "معرض صور/فيديو",
+          ],
+      )
+      m_date = st.text_input(
+          "تاريخ الفعالية/النشر:", value=datetime.now().strftime("%Y-%m-%d")
+      )
+      m_link = st.text_input("رابط النشر (إن وجد):")
+      m_details = st.text_area("ملخص التغطية / النص الإعلامي:")
+
+      if st.form_submit_button("💾 حفظ التغطية الإعلامية") and m_title:
+        conn = get_connection()
+        conn.execute(
+            """INSERT INTO media_archive (title, category, event_date, link_url, details)
+                       VALUES (?, ?, ?, ?, ?)""",
+            (m_title, m_cat, m_date, m_link, m_details),
+        )
+        conn.commit()
+        conn.close()
+        st.success("✅ تم أرشفة التغطية الإعلامية بنجاح!")
+        st.rerun()
+
+  with tab_med_view:
+    conn = get_connection()
+    df_media = pd.read_sql_query(
+        """SELECT id AS 'م', title AS 'العنوان', category AS 'التصنيف', event_date AS 'تاريخ النشر', link_url AS 'الرابط', details AS 'التفاصيل' FROM media_archive""",
+        conn,    )
+    conn.close()
+    render_export_and_print_tools(df_media, "الأرشيف الإعلامي للملتقى", key_prefix="media_archive")
+
+  with tab_med_edit:
+    conn = get_connection()
+    m_recs = conn.execute("SELECT id, title, category FROM media_archive").fetchall()
+    conn.close()
+
+    if m_recs:
+      m_opts = {f"{r[0]} - {r[1]} ({r[2]})": r[0] for r in m_recs}
+      sel_m = st.selectbox("اختر الخبر للتعديل/الحذف:", list(m_opts.keys()))
+      sel_m_id = m_opts[sel_m]
+
+      conn = get_connection()
+      m_row = conn.execute("SELECT * FROM media_archive WHERE id=?", (sel_m_id,)).fetchone()
+      conn.close()
+
+      with st.form("edit_media_form"):
+        em_title = st.text_input("العنوان:", value=m_row[1])
+        em_cat = st.text_input("التصنيف:", value=m_row[2])
+        em_date = st.text_input("التاريخ:", value=m_row[3])
+        em_link = st.text_input("الرابط:", value=m_row[4] or "")
+        em_details = st.text_area("التفاصيل:", value=m_row[5] or "")
+
+        if st.form_submit_button("💾 حفظ التعديل"):
+          conn = get_connection()
+          conn.execute(
+              """UPDATE media_archive SET title=?, category=?, event_date=?, link_url=?, details=? WHERE id=?""",
+              (em_title, em_cat, em_date, em_link, em_details, sel_m_id)
+          )
+          conn.commit()
+          conn.close()
+          st.success("✅ تم تعديل الخبر الإعلامي بنجاح!")
+          st.rerun()
+
+      if st.button("❌ حذف الخبر نهائياً", type="primary", key="del_media_btn"):
+        conn = get_connection()
+        conn.execute("DELETE FROM media_archive WHERE id=?", (sel_m_id,))
+        conn.commit()
+        conn.close()
+        st.success("🗑️ تم الحذف بنجاح!")
+        st.rerun()
+
+# --- 🛡️ اللجنة العسكرية ---
+elif menu_option == "🛡️ اللجنة العسكرية":
+  st.header("🛡️ سجلات وشؤون اللجنة العسكرية والميدانية")
+
+  tab_mil_add, tab_mil_view, tab_mil_edit = st.tabs(
+      ["➕ إضافة سجل عسكري / ميداني", "📋 السجل العام والتصدير والطباعة", "✏️ تعديل وحذف"]
+  )
+
+  with tab_mil_add:
+    with st.form("add_military_form"):
+      mil_name = st.text_input("الاسم الكامل *:")
+      mil_role = st.text_input("الصفة / الرتبة / المهمة الميدانية:")
+      mil_sector = st.text_input("الموقع / القطاع / الجبهة:")
+      mil_phone = st.text_input("رقم الهاتف للتواصل:")
+      mil_status = st.selectbox("الحالة الميدانية:", ["على رأس العمل", "إجازة", "مهمة خاصة", "غير ذلك"])
+      mil_notes = st.text_area("ملاحظات وتعليمات إضافية:")
+
+      if st.form_submit_button("💾 حفظ السجل"):
+        if mil_name:
+          conn = get_connection()
+          conn.execute(
+              """INSERT INTO military_records (member_name, rank_role, sector_location, phone, status, notes)
+                         VALUES (?, ?, ?, ?, ?, ?)""",
+              (mil_name, mil_role, mil_sector, mil_phone, mil_status, mil_notes)
+          )
+          conn.commit()
+          conn.close()
+          st.success("✅ تم حفظ البيانات السجل الميداني بنجاح!")
+          st.rerun()
+
+  with tab_mil_view:
+    conn = get_connection()
+    df_mil = pd.read_sql_query(
+        """SELECT id AS 'م', member_name AS 'الاسم', rank_role AS 'المهمة/الصفة', sector_location AS 'القطاع/الموقع', phone AS 'الهاتف', status AS 'الحالة', notes AS 'ملاحظات' FROM military_records""",
+        conn,    )
+    conn.close()
+    render_export_and_print_tools(df_mil, "السجل الميداني والعسكري", key_prefix="military_list")
+
+  with tab_mil_edit:
+    conn = get_connection()
+    mil_recs = conn.execute("SELECT id, member_name, rank_role FROM military_records").fetchall()
+    conn.close()
+
+    if mil_recs:
+      mil_opts = {f"{r[0]} - {r[1]} ({r[2]})": r[0] for r in mil_recs}
+      sel_mil = st.selectbox("اختر السجل للتعديل/الحذف:", list(mil_opts.keys()))
+      sel_mil_id = mil_opts[sel_mil]
+
+      conn = get_connection()
+      mil_row = conn.execute("SELECT * FROM military_records WHERE id=?", (sel_mil_id,)).fetchone()
+      conn.close()
+
+      with st.form("edit_mil_form"):
+        emil_name = st.text_input("الاسم:", value=mil_row[1])
+        emil_role = st.text_input("الصفة / المهمة:", value=mil_row[2] or "")
+        emil_sector = st.text_input("القطاع / الموقع:", value=mil_row[3] or "")
+        emil_phone = st.text_input("الهاتف:", value=mil_row[4] or "")
+        emil_status = st.selectbox("الحالة:", ["على رأس العمل", "إجازة", "مهمة خاصة", "غير ذلك"])
+        emil_notes = st.text_area("ملاحظات:", value=mil_row[6] or "")
+
+        if st.form_submit_button("💾 حفظ التعديل"):
+          conn = get_connection()
+          conn.execute(
+              """UPDATE military_records SET member_name=?, rank_role=?, sector_location=?, phone=?, status=?, notes=? WHERE id=?""",
+              (emil_name, emil_role, emil_sector, emil_phone, emil_status, emil_notes, sel_mil_id)
+          )
+          conn.commit()
+          conn.close()
+          st.success("✅ تم تعديل السجل الميداني بنجاح!")
+          st.rerun()
+
+      if st.button("❌ حذف السجل نهائياً", type="primary", key="del_mil_btn"):
+        conn = get_connection()
+        conn.execute("DELETE FROM military_records WHERE id=?", (sel_mil_id,))
+        conn.commit()
+        conn.close()
+        st.success("🗑️ تم الحذف بنجاح!")
+        st.rerun()
+
+# --- 📂 الأرشيف والمستندات ---
+elif menu_option == "📂 الأرشيف والمستندات":
+  st.header("📂 الأرشيف العام وتوثيق المعاملات والمستندات")
+
+  tab_arch_add, tab_arch_view, tab_arch_edit = st.tabs(
+      ["➕ إضافة وثيقة/معاملة", "📋 الأرشيف العام والتصدير والطباعة", "✏️ تعديل وحذف"]
+  )
+
+  with tab_arch_add:
+    with st.form("add_archive_form"):
+      doc_title = st.text_input("عنوان الوثيقة / المعاملة *:")
+      doc_type = st.selectbox("نوع الوثيقة:", ["رسالة رسمية", "محضر اجتماع", "عقد / اتفاقية", "قرار إداري", "أخرى"])
+      doc_date = st.text_input("تاريخ الوثيقة:", value=datetime.now().strftime("%Y-%m-%d"))
+      details = st.text_area("فحوى / تفاصيل الوثيقة:")
+
+      if st.form_submit_button("💾 أرشفة المستند") and doc_title:
+        conn = get_connection()
+        conn.execute(
+            "INSERT INTO archive (doc_title, doc_type, doc_date, details) VALUES (?, ?, ?, ?)",
+            (doc_title, doc_type, doc_date, details)
+        )
+        conn.commit()
+        conn.close()
+        st.success("✅ تم أرشفة المستند بنجاح!")
+        st.rerun()
+
+  with tab_arch_view:
+    conn = get_connection()
+    df_arch = pd.read_sql_query(
+        """SELECT id AS 'م', doc_title AS 'عنوان الوثيقة', doc_type AS 'النوع', doc_date AS 'التاريخ', details AS 'التفاصيل' FROM archive""",
+        conn,    )
+    conn.close()
+    render_export_and_print_tools(df_arch, "سجل الأرشيف والمستندات العامة", key_prefix="general_archive")
+
+  with tab_arch_edit:
+    conn = get_connection()
+    arch_recs = conn.execute("SELECT id, doc_title FROM archive").fetchall()
+    conn.close()
+
+    if arch_recs:
+      arch_opts = {f"{r[0]} - {r[1]}": r[0] for r in arch_recs}
+      sel_arch = st.selectbox("اختر الوثيقة للتعديل/الحذف:", list(arch_opts.keys()))
+      sel_arch_id = arch_opts[sel_arch]
+
+      conn = get_connection()
+      a_row = conn.execute("SELECT * FROM archive WHERE id=?", (sel_arch_id,)).fetchone()
+      conn.close()
+
+      with st.form("edit_arch_form"):
+        ea_title = st.text_input("عنوان الوثيقة:", value=a_row[1])
+        ea_type = st.text_input("النوع:", value=a_row[2])
+        ea_date = st.text_input("التاريخ:", value=a_row[3])
+        ea_details = st.text_area("التفاصيل:", value=a_row[4] or "")
+
+        if st.form_submit_button("💾 حفظ التعديل"):
+          conn = get_connection()
+          conn.execute(
+              "UPDATE archive SET doc_title=?, doc_type=?, doc_date=?, details=? WHERE id=?",
+              (ea_title, ea_type, ea_date, ea_details, sel_arch_id)
+          )
+          conn.commit()
+          conn.close()
+          st.success("✅ تم تعديل بيانات المستند بنجاح!")
+          st.rerun()
+
+      if st.button("❌ حذف الوثيقة نهائياً", type="primary", key="del_arch_btn"):
+        conn = get_connection()
+        conn.execute("DELETE FROM archive WHERE id=?", (sel_arch_id,))
+        conn.commit()
+        conn.close()
+        st.success("🗑️ تم حذف الوثيقة من الأرشيف!")
         st.rerun()
 
 # --- 🔑 تغيير كلمة المرور ---
 elif menu_option == "🔑 تغيير كلمة المرور":
-  st.header("🔑 تغيير كلمة المرور الحالية")
+  st.header("🔑 تغيير كلمة المرور للحساب الحالي")
   with st.form("change_pass_form"):
     curr_pass = st.text_input("كلمة المرور الحالية:", type="password")
     new_pass = st.text_input("كلمة المرور الجديدة:", type="password")
@@ -1323,142 +1250,71 @@ elif menu_option == "🔑 تغيير كلمة المرور":
           conn.close()
           st.success("✅ تم تغيير كلمة المرور بنجاح!")
         else:
-          st.error("كلمتا المرور غير متطابقتين أو فارغتين ❌")
+          st.error("كلمتا المرور غير متطابقتين ❌")
       else:
         st.error("كلمة المرور الحالية غير صحيحة ❌")
 
-# --- 🔐 إدارة المستخدمين وكلمات المرور ---
-elif menu_option == "🔐 إدارة المستخدمين وكلمات المرور":
-  st.header("🔐 إدارة المستخدمين وصلاحيات الوصول")
-  tab1, tab2, tab3 = st.tabs(
-      ["➕ إضافة مستخدم جديد", "📋 قائمة المستخدمين", "✏️ تعديل وحذف"]
-  )
+# --- 🏛️ إدارة أعضاء اللجان ---
+elif menu_option == "🏛️ إدارة أعضاء اللجان":
+  st.header("🏛️ إدارة أعضاء وكوادر كافة اللجان")
+  conn = get_connection()
+  df_comm = pd.read_sql_query(
+      """SELECT id AS 'م', committee_name AS 'اللجنة', member_name AS 'اسم العضو', role AS 'المسمى التنظيمي', phone AS 'الهاتف', notes AS 'ملاحظات' FROM committee_members""",
+      conn,  )
+  conn.close()
+  render_export_and_print_tools(df_comm, "كشف أعضاء اللجان التنظيمية", key_prefix="committee_members")
 
-  with tab1:
-    with st.form("add_user_form"):
-      u_fullname = st.text_input("الاسم الكامل للمستخدم:")
-      u_name = st.text_input("اسم المستخدم (Username):")
-      u_pass = st.text_input("كلمة المرور:", type="password")
-      u_role = st.selectbox("الصلاحية:", ["مشرف النظام", "مستخدم عادي"])
+# --- 🔐 إدارة المستخدمين والصلاحيات ---
+elif menu_option == "🔐 إدارة المستخدمين والصلاحيات":
+  st.header("🔐 إدارة حسابات النظام والصلاحيات")
+  conn = get_connection()
+  df_users = pd.read_sql_query(
+      """SELECT id AS 'م', full_name AS 'الاسم الكامل', username AS 'اسم المستخدم', role AS 'الصلاحية' FROM users""",
+      conn,  )
+  conn.close()
+  st.dataframe(df_users, use_container_width=True)
 
-      if st.form_submit_button("💾 إنشاء حساب مستخدم"):
-        if u_name and u_pass:
-          try:
-            conn = get_connection()
-            conn.execute(
-                "INSERT INTO users (username, password, role, full_name)"
-                " VALUES (?, ?, ?, ?)",
-                (u_name, u_pass, u_role, u_fullname),
-            )
-            conn.commit()
-            conn.close()
-            st.success("تم إنشاء الحساب بنجاح!")
-          except Exception as e:
-            st.error(f"خطأ أثناء إنشاء الحساب (ربما اسم المستخدم مكرر): {e}")
-        else:
-          st.warning("يرجى ملء كافة الحقول الأساسية.")
-
-  with tab2:
-    conn = get_connection()
-    df = pd.read_sql_query(
-        "SELECT id AS 'م', full_name AS 'الاسم الكامل', username AS 'اسم"
-        " المستخدم', password AS 'كلمة المرور', role AS 'الصلاحية' FROM users",
-        conn,    )
-    conn.close()
-    st.dataframe(df, use_container_width=True)
-
-  with tab3:
-    conn = get_connection()
-    users_list = conn.execute("SELECT id, username FROM users").fetchall()
-    conn.close()
-
-    if users_list:
-      u_opts = {f"{r[0]} - {r[1]}": r[0] for r in users_list}
-      sel_u = st.selectbox(
-          "اختر حساب المستخدم للتعديل/الحذف:",
-          list(u_opts.keys()),
-          key="sb_users",
-      )
-      sel_u_id = u_opts[sel_u]
-
-      conn = get_connection()
-      u_data = conn.execute(
-          "SELECT * FROM users WHERE id=?", (sel_u_id,)
-      ).fetchone()
-      conn.close()
-
-      with st.form("edit_user_form"):
-        eu_fullname = st.text_input("الاسم الكامل:", value=u_data[4])
-        eu_username = st.text_input("اسم المستخدم:", value=u_data[1])
-        eu_password = st.text_input("كلمة المرور:", value=u_data[2])
-        eu_role = st.selectbox(
-            "الصلاحية:",
-            ["مشرف النظام", "مستخدم عادي"],
-            index=0 if u_data[3] == "مشرف النظام" else 1,
-        )
-
-        if st.form_submit_button("💾 حفظ تعديلات الحساب"):
-          conn = get_connection()
-          conn.execute(
-              "UPDATE users SET username=?, password=?, role=?, full_name=?"
-              " WHERE id=?",
-              (eu_username, eu_password, eu_role, eu_fullname, sel_u_id),
-          )
-          conn.commit()
-          conn.close()
-          st.success("تم تعديل بيانات المستخدم بنجاح!")
-          st.rerun()
-
-      if sel_u_id != 1:  # حماية الحساب الرئيسي الأول من الحذف
-        if st.button("❌ حذف هذا المستخدم نهائياً", type="primary"):
-          conn = get_connection()
-          conn.execute("DELETE FROM users WHERE id=?", (sel_u_id,))
-          conn.commit()
-          conn.close()
-          st.success("تم حذف المستخدم بنجاح!")
-          st.rerun()
-
-# --- 📥 تصدير التقارير (Excel) ---
-elif menu_option == "📥 تصدير التقارير (Excel)":
+# --- 📥 مركز تصدير التقارير (Excel) ---
+elif menu_option == "📥 مركز تصدير التقارير (Excel)":
   st.header("📥 المركز الموحد لتصدير البيانات والتقارير إلى Excel")
   target = st.selectbox(
       "اختر الجدول المطلوب تصديره:",
       [
-          "اعضاء اللجان التابعة للملتقى",
-          "استمارات النازحين المفصلة",
-          "سجل النازحين المكتمل",
-          "كشف توزيع السلال الغذائية",
-          "كشف الكفالات والرعايات",
-          "الأرشيف والمستندات",
-          "دفتر الحسابات والصندوق",
-          "كادر القوى البشرية",
+          "كشف النازحين والاستمارات",
+          "سجل السلال الغذائية",
+          "سجل الكفالات والرعايات",
+          "دفتر الحسابات والمالية",
+          "الأرشيف الإعلامي",
+          "السجل العسكري والميداني",
+          "الأرشيف العام والوثائق",
+          "أعضاء اللجان",
       ],
   )
 
   conn = get_connection()
-  if target == "اعضاء اللجان التابعة للملتقى":
-    df_exp = pd.read_sql_query("SELECT * FROM committee_members", conn)
-  elif target == "استمارات النازحين المفصلة":
-    df_exp = pd.read_sql_query("SELECT * FROM full_refugee_forms", conn)
-  elif target == "سجل النازحين المكتمل":
+  if target == "كشف النازحين والاستمارات":
     df_exp = pd.read_sql_query("SELECT * FROM displaced_persons", conn)
-  elif target == "كشف توزيع السلال الغذائية":
+  elif target == "سجل السلال الغذائية":
     df_exp = pd.read_sql_query("SELECT * FROM food_baskets", conn)
-  elif target == "كشف الكفالات والرعايات":
+  elif target == "سجل الكفالات والرعايات":
     df_exp = pd.read_sql_query("SELECT * FROM sponsorships", conn)
-  elif target == "الأرشيف والمستندات":
-    df_exp = pd.read_sql_query("SELECT * FROM archive", conn)
-  elif target == "دفتر الحسابات والصندوق":
+  elif target == "دفتر الحسابات والمالية":
     df_exp = pd.read_sql_query("SELECT * FROM finance", conn)
+  elif target == "الأرشيف الإعلامي":
+    df_exp = pd.read_sql_query("SELECT * FROM media_archive", conn)
+  elif target == "السجل العسكري والميداني":
+    df_exp = pd.read_sql_query("SELECT * FROM military_records", conn)
+  elif target == "الأرشيف العام والوثائق":
+    df_exp = pd.read_sql_query("SELECT * FROM archive", conn)
   else:
-    df_exp = pd.read_sql_query("SELECT * FROM hr_members", conn)
+    df_exp = pd.read_sql_query("SELECT * FROM committee_members", conn)
   conn.close()
 
   if not df_exp.empty:
     st.dataframe(df_exp, use_container_width=True)
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-      df_exp.to_excel(writer, index=False, sheet_name="بيانات")
+      df_exp.to_excel(writer, index=False, sheet_name="البيانات")
     st.download_button(
         label=f"📥 تحميل ملف Excel ({target})",
         data=buffer.getvalue(),

@@ -1,4 +1,3 @@
-
 # ==========================================
 # 1️⃣ المكتبات والتهيئة الأساسية
 # ==========================================
@@ -124,8 +123,12 @@ def render_export_and_print_tools(df, section_title):
 
   with col1:
     buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-      df.to_excel(writer, index=False, sheet_name="البيانات")
+    try:
+      with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="البيانات")
+    except Exception:
+      with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df.to_excel(writer, index=False, sheet_name="البيانات")
 
     st.download_button(
         label="📥 تصدير الكشف إلى Excel",
@@ -231,13 +234,6 @@ with st.sidebar:
   if is_admin:
     options.extend([
         "🔍 عرض استمارات النازحين",
-        "✏️ تعديل بيانات الاستمارات",
-        "📦 توزيع السلال الغذائية",
-        "🤝 إدارة الكفالات والرعايات",
-        "📂 الأرشيف والمستندات",
-        "💰 الصندوق والحسابات (الوارد والمنصرف)",
-        "👥 إدارة القوى البشرية والكادر",
-        "🔐 إدارة المستخدمين وكلمات المرور",
         "📥 تصدير التقارير (Excel)",
     ])
 
@@ -373,7 +369,7 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
           "عدد مرات النزوح:", min_value=1, value=1, step=1
       )
 
-    st.subheader("👨👩👧👦 عدد أفراد الأسرة بالتفصيل")
+    st.subheader("👨‍👩‍👧‍👦 عدد أفراد الأسرة بالتفصيل")
     spouse_name = st.text_input("اسم الزوج / الزوجة رباعياً:")
 
     st.markdown("**توزيع الأفراد الذكور والإناث والاجماليات:**")
@@ -438,24 +434,7 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
     with h_col6:
       landlord_phone = st.text_input("رقم الجوال (المؤجر):")
 
-    st.subheader("👨👩👧👦 بيانات أفراد الأسرة التفصيلية (جدول البيانات)")
-    st.caption("أدخل بيانات أفراد الأسرة إذا توفرت:")
-    members_data = []
-    for i in range(1, 6):
-      fm1, fm2, fm3, fm4 = st.columns([3, 2, 2, 2])
-      with fm1:
-        m_name = st.text_input(f"اسم الفرد ({i}):", key=f"mem_name_{i}")
-      with fm2:
-        m_dob = st.text_input(f"تاريخ الميلاد ({i}):", key=f"mem_dob_{i}")
-      with fm3:
-        m_rel = st.text_input(f"صلة القرابة ({i}):", key=f"mem_rel_{i}")
-      with fm4:
-        m_edu = st.text_input(f"المستوى التعليمي ({i}):", key=f"mem_edu_{i}")
-      if m_name:
-        members_data.append(f"{m_name} ({m_rel})")
-
     st.subheader("📋 أهم الاحتياجات والمنظمات")
-    st.markdown("**أهم الاحتياجات:**")
     nd1, nd2, nd3, nd4, nd5, nd6, nd7 = st.columns(7)
     with nd1:
       need_shelter = st.checkbox("مأوى")
@@ -502,45 +481,157 @@ elif menu_option == "📝 تعبئة استمارة جديدة":
       if head_name and head_name.strip() != "":
         try:
           conn = get_connection()
-          cursor = conn.cursor()
+          c = conn.cursor()
 
-          # الإدخال في جدول الاستمارة الكاملة التفصيلية
-          data_dict = {
-              "doc_number": doc_number,
-              "doc_date": doc_date,
-              "doc_hijri": doc_hijri,
-              "attachments": attachments,
-              "head_name": head_name,
-              "phone": phone,
-              "edu_level": edu_level,
-              "dob": dob,
-              "id_number": id_number,
-              "job_type": job_type,
-              "employer": employer,
-              "qualification": qualification,
-              "specialization": specialization,
-              "blood_type": blood_type,
-              "health_status": health_status,
-              "disease_type": disease_type,
-              "id_issue_place": id_issue_place,
-              "orig_gov": orig_gov,
-              "orig_dir": orig_dir,
-              "orig_sub": orig_sub,
-              "orig_village": orig_village,
-              "prev_gov": prev_gov,
-              "prev_dir": prev_dir,
-              "prev_sub": prev_sub,
-              "prev_village": prev_village,
-              "relative_name": relative_name,
-              "relative_relation": relative_relation,
-              "relative_phone": relative_phone,
-              "family_status": family_status,
-              "displacement_date": displacement_date,
-              "displacement_count": int(displacement_count),
-              "spouse_name": spouse_name,
-              "m_under_1": int(m_under_1),
-              "m_1_5": int(m_1_5),
-              "m_6_17": int(m_6_17),
-              "m_18_59": int(m_1
+          # 1️⃣ حفظ البيانات في جدول الاستمارة التفصيلية
+          c.execute(
+              """INSERT INTO full_refugee_forms (
+                    doc_number, doc_date, doc_hijri, attachments, head_name, phone, edu_level, dob,
+                    id_number, job_type, employer, qualification, specialization, blood_type, health_status,
+                    disease_type, id_issue_place, orig_gov, orig_dir, orig_sub, orig_village, prev_gov,
+                    prev_dir, prev_sub, prev_village, relative_name, relative_relation, relative_phone,
+                    family_status, displacement_date, displacement_count, spouse_name, m_under_1, m_1_5,
+                    m_6_17, m_18_59, m_60_plus, f_under_1, f_1_5, f_6_17, f_18_59, f_60_plus, total_family,
+                    disabled_count, sponsored_count, house_num, house_type, house_ownership, landlord_name,
+                    house_gov, landlord_phone, need_shelter, need_supplies, need_water, need_food, need_medical,
+                    need_school, need_bathrooms, registered_wfp, current_org, other_needs, delegate_name, delegate_sub
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+              (
+                  doc_number,
+                  doc_date,
+                  doc_hijri,
+                  attachments,
+                  head_name,
+                  phone,
+                  edu_level,
+                  dob,
+                  id_number,
+                  job_type,
+                  employer,
+                  qualification,
+                  specialization,
+                  blood_type,
+                  health_status,
+                  disease_type,
+                  id_issue_place,
+                  orig_gov,
+                  orig_dir,
+                  orig_sub,
+                  orig_village,
+                  prev_gov,
+                  prev_dir,
+                  prev_sub,
+                  prev_village,
+                  relative_name,
+                  relative_relation,
+                  relative_phone,
+                  family_status,
+                  displacement_date,
+                  int(displacement_count),
+                  spouse_name,
+                  int(m_under_1),
+                  int(m_1_5),
+                  int(m_6_17),
+                  int(m_18_59),
+                  int(m_60_plus),
+                  int(f_under_1),
+                  int(f_1_5),
+                  int(f_6_17),
+                  int(f_18_59),
+                  int(f_60_plus),
+                  int(total_family),
+                  int(disabled_count),
+                  int(sponsored_count),
+                  house_num,
+                  house_type,
+                  house_ownership,
+                  landlord_name,
+                  house_gov,
+                  landlord_phone,
+                  "نعم" if need_shelter else "لا",
+                  "نعم" if need_supplies else "لا",
+                  "نعم" if need_water else "لا",
+                  "نعم" if need_food else "لا",
+                  "نعم" if need_medical else "لا",
+                  "نعم" if need_school else "لا",
+                  "نعم" if need_bathrooms else "لا",
+                  registered_wfp,
+                  current_org,
+                  other_needs,
+                  delegate_name,
+                  delegate_sub,
+              ),
+          )
 
-ليش الكود ما يحفظ الاستمارة بشكل مستمر في قاعدة بيانات ويمكن الوصول إليها في اي وقت
+          # 2️⃣ حفظ البيانات في جدول النازحين العام
+          c.execute(
+              """INSERT INTO displaced_persons (
+                    doc_number, doc_date, doc_hijri, head_name, phone, id_number,
+                    orig_gov, orig_dir, current_location, family_members, status, notes
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+              (
+                  doc_number,
+                  doc_date,
+                  doc_hijri,
+                  head_name,
+                  phone,
+                  id_number,
+                  orig_gov,
+                  orig_dir,
+                  house_gov,
+                  int(total_family),
+                  "نازح",
+                  other_needs,
+              ),
+          )
+
+          # تأكيد وتطبيق الحفظ بصفة دائمة
+          conn.commit()
+          conn.close()
+
+          st.success(
+              f"تم حفظ استمارة الأخ ({head_name}) في قاعدة البيانات بنجاح وبشكل"
+              " دائم! ✅"
+          )
+        except Exception as e:
+          st.error(f"حدث خطأ أثناء الحفظ في قاعدة البيانات: {e}")
+      else:
+        st.error("يرجى إدخال اسم رب الأسرة على الأقل ⚠️")
+
+# --- 🔍 عرض استمارات النازحين ---
+elif menu_option == "🔍 عرض استمارات النازحين":
+  st.title("🔍 عرض استمارات النازحين المسجلة")
+  conn = get_connection()
+  df_forms = pd.read_sql_query("SELECT * FROM full_refugee_forms", conn)
+  conn.close()
+  render_export_and_print_tools(df_forms, "كشف_استمارات_النازحين_الشامل")
+
+# --- 📥 تصدير التقارير (Excel) ---
+elif menu_option == "📥 تصدير التقارير (Excel)":
+  st.title("📥 تصدير التقارير واستعراض الجداول")
+  conn = get_connection()
+  df_displaced = pd.read_sql_query("SELECT * FROM displaced_persons", conn)
+  conn.close()
+  render_export_and_print_tools(df_displaced, "كشف_النازحين_الموجز")
+
+# --- 🔑 تغيير كلمة المرور ---
+elif menu_option == "🔑 تغيير كلمة المرور":
+  st.title("🔑 تغيير كلمة المرور")
+  with st.form("change_pass_form"):
+    new_pass = st.text_input("كلمة المرور الجديدة:", type="password")
+    confirm_pass = st.text_input("تأكيد كلمة المرور:", type="password")
+    btn_change = st.form_submit_button("تحديث كلمة المرور")
+
+    if btn_change:
+      if new_pass and new_pass == confirm_pass:
+        conn = get_connection()
+        c = conn.cursor()
+        c.execute(
+            "UPDATE users SET password = ? WHERE username = ?",
+            (new_pass, st.session_state["username"]),
+        )
+        conn.commit()
+        conn.close()
+        st.success("تم تحديث كلمة المرور بنجاح! ✅")
+      else:
+        st.error("كلمتا المرور غير متطابقتين ❌")
